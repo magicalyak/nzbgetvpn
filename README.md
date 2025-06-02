@@ -264,6 +264,27 @@ VPN_PASS=your_pia_password
 
 </details>
 
+<details>
+<summary><strong>🔒 Privado VPN</strong></summary>
+
+**OpenVPN:**
+```ini
+VPN_CLIENT=openvpn
+VPN_CONFIG=/config/openvpn/privado-us.ovpn
+VPN_USER=your_privado_username
+VPN_PASS=your_privado_password
+```
+
+**WireGuard:**
+```ini
+VPN_CLIENT=wireguard
+VPN_CONFIG=/config/wireguard/privado-us.conf
+```
+
+Download configs: [Privado VPN Manual Setup](https://privadovpn.com/support/manual-setup/)
+
+</details>
+
 ## 📊 Enhanced Monitoring & Auto-Restart
 
 Enable advanced monitoring and automatic service recovery:
