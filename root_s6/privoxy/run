@@ -4,7 +4,13 @@
 
 # Exit if Privoxy is not enabled
 if [[ "${ENABLE_PRIVOXY,,}" != "yes" && "${ENABLE_PRIVOXY,,}" != "true" ]]; then
-  echo "[INFO] Privoxy is disabled (ENABLE_PRIVOXY is not 'yes' or 'true'). Exiting privoxy service script."
+  # Only print the 'disabled' message once during container lifetime.
+  # Use a flag file to track if the message has already been shown.
+  FLAG_FILE="/tmp/privoxy-disabled-message-shown"
+  if [[ ! -f "$FLAG_FILE" ]]; then
+    echo "[INFO] Privoxy is disabled (ENABLE_PRIVOXY is not 'yes' or 'true'). Exiting privoxy service script."
+    touch "$FLAG_FILE"
+  fi
   exit 111 # Exit with 111 to tell s6-rc this service is permanently down
 fi
 
