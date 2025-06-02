@@ -5,6 +5,12 @@ name: Build and Publish Multi-Architecture Docker Images
 # separate terms of service, privacy policy, and support
 # documentation.
 
+# Grant permissions for GITHUB_TOKEN to push to GitHub Container Registry
+permissions:
+  contents: read
+  packages: write
+
+
 on:
   push:
     branches:
