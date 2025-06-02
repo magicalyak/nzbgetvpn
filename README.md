@@ -61,7 +61,7 @@ This guide focuses on running the pre-built `magicalyak/nzbgetvpn` image from Do
 
 **1. Prepare Your Docker Host System 🛠️**
 
-It's highly recommended to create your host directories *before* running the container. This ensures correct ownership and provides a clear place for your VPN and `.env` files.
+It's highly recommended to create your host directories *before* running the container. This ensures correct ownership and provides a clear place for your VPN configuration files.
 
 *   **Why pre-create directories?**
     *   **Permissions:** Avoids `root`-owned directories if Docker auto-creates them, which can cause permission issues with NZBGet (running as `PUID`/`PGID`).
@@ -71,103 +71,157 @@ It's highly recommended to create your host directories *before* running the con
 Example:
 ```bash
 # Choose your base directory (e.g., /opt/nzbgetvpn_data or ~/nzbgetvpn_data)
-HOST_DATA_DIR="/opt/nzbgetvpn_data"
+HOST_DATA_DIR="/opt/nzbgetvpn_data" # CHANGEME
 
 mkdir -p "${HOST_DATA_DIR}/config/openvpn"
 mkdir -p "${HOST_DATA_DIR}/config/wireguard"
 mkdir -p "${HOST_DATA_DIR}/downloads"
 
 echo "Host directories created under ${HOST_DATA_DIR}"
-# Ensure correct ownership for PUID/PGID if needed.
+# Ensure correct ownership for PUID/PGID if needed, matching what you'll use below.
 ```
-Place your VPN files into `${HOST_DATA_DIR}/config/openvpn/` or `${HOST_DATA_DIR}/config/wireguard/`.
+Place your VPN configuration files (e.g., `your_provider.ovpn`, `wg0.conf`, and optionally `credentials.txt` for OpenVPN) into the appropriate subfolders on your host:
+*   OpenVPN: `${HOST_DATA_DIR}/config/openvpn/`
+*   WireGuard: `${HOST_DATA_DIR}/config/wireguard/`
 
-**2. Create Your `.env` Configuration File 📝**
+**2. Running with `docker run` (Minimal Setup) 🐳**
 
-In your `HOST_DATA_DIR` (e.g., `/opt/nzbgetvpn_data/.env`), create an `.env` file. See `.env.sample` for all options.
+This is the quickest way to get started. Adjust `HOST_DATA_DIR` to your path from Step 1. Remember to replace all `CHANGEME` placeholders with your actual values.
 
-**Minimal `.env` for OpenVPN (using `VPN_USER`/`VPN_PASS`):**
+**Minimal OpenVPN Example (Direct Environment Variables):**
+```bash
+# Define your host data directory (must match Step 1)
+HOST_DATA_DIR="/opt/nzbgetvpn_data" # CHANGEME
+
+docker run -d \
+  --name nzbgetvpn \
+  --rm \
+  --cap-add=NET_ADMIN \
+  --device=/dev/net/tun \
+  -p 6789:6789 \ # NZBGet WebUI
+  -v "${HOST_DATA_DIR}/config:/config" \
+  -v "${HOST_DATA_DIR}/downloads:/downloads" \
+  -e VPN_CLIENT=openvpn \
+  -e VPN_CONFIG=/config/openvpn/your_provider.ovpn \ # CHANGEME to your .ovpn file name
+  # -e VPN_USER=your_vpn_username \ # CHANGEME (or use credentials.txt)
+  # -e VPN_PASS=your_vpn_password \ # CHANGEME (or use credentials.txt)
+  -e PUID=1000 \ # CHANGEME to your user's ID
+  -e PGID=1000 \ # CHANGEME to your user's group ID
+  -e TZ=America/New_York \ # CHANGEME to your timezone
+  # ---- Optional: Pre-configure NZBGet's First News Server (Server1) ----
+  # If you omit these, configure your news server in NZBGet WebUI after startup.
+  # -e NZBGET_S1_NAME=MyNewsServer \ # CHANGEME (e.g., EasyNews)
+  # -e NZBGET_S1_HOST=news.example.com \ # CHANGEME (news server address)
+  # -e NZBGET_S1_PORT=563 \ # CHANGEME (563 for SSL, 119 for non-SSL)
+  # -e NZBGET_S1_USER=server_username \ # CHANGEME
+  # -e NZBGET_S1_PASS=server_password \ # CHANGEME
+  # -e NZBGET_S1_CONN=10 \ # CHANGEME (number of connections)
+  # -e NZBGET_S1_SSL=yes \ # CHANGEME ('yes' for SSL, 'no' otherwise)
+  # -e NZBGET_S1_LEVEL=0 \ # Optional: Server level (priority)
+  # Add other -e flags for more options (see "Environment Variables" section)
+  magicalyak/nzbgetvpn:latest
+```
+*   If your OpenVPN file uses `auth-user-pass /config/openvpn/credentials`, create `${HOST_DATA_DIR}/config/openvpn/credentials` (username on line 1, password on line 2) and you can omit/comment out the `VPN_USER`/`VPN_PASS` environment variables.
+
+**Minimal WireGuard Example (Direct Environment Variables):**
+```bash
+# Define your host data directory (must match Step 1)
+HOST_DATA_DIR="/opt/nzbgetvpn_data" # CHANGEME
+
+docker run -d \
+  --name nzbgetvpn \
+  --rm \
+  --cap-add=NET_ADMIN \
+  --cap-add=SYS_MODULE \ # May be needed for WireGuard kernel module
+  --sysctl="net.ipv4.conf.all.src_valid_mark=1" \ # Recommended for WireGuard
+  # --sysctl="net.ipv6.conf.all.disable_ipv6=0" \ # Uncomment if using IPv6 with WireGuard
+  --device=/dev/net/tun \
+  -p 6789:6789 \ # NZBGet WebUI
+  -v "${HOST_DATA_DIR}/config:/config" \
+  -v "${HOST_DATA_DIR}/downloads:/downloads" \
+  -e VPN_CLIENT=wireguard \
+  -e VPN_CONFIG=/config/wireguard/wg0.conf \ # CHANGEME to your .conf file name
+  -e PUID=1000 \ # CHANGEME
+  -e PGID=1000 \ # CHANGEME
+  -e TZ=America/New_York \ # CHANGEME
+  # ---- Optional: Pre-configure NZBGet's First News Server (Server1) ----
+  # If you omit these, configure your news server in NZBGet WebUI after startup.
+  # -e NZBGET_S1_NAME=MyNewsServer \ # CHANGEME
+  # -e NZBGET_S1_HOST=news.example.com \ # CHANGEME
+  # -e NZBGET_S1_PORT=563 \ # CHANGEME
+  # -e NZBGET_S1_USER=server_username \ # CHANGEME
+  # -e NZBGET_S1_PASS=server_password \ # CHANGEME
+  # -e NZBGET_S1_CONN=10 \ # CHANGEME
+  # -e NZBGET_S1_SSL=yes \ # CHANGEME
+  # -e NZBGET_S1_LEVEL=0 \
+  # Add other -e flags for more options (see "Environment Variables" section)
+  magicalyak/nzbgetvpn:latest
+```
+
+**3. Recommended: Using an `.env` File with `docker run` 📝**
+
+For a cleaner `docker run` command, especially when using many environment variables, you can place them in an `.env` file.
+
+1.  Create an `.env` file in your `HOST_DATA_DIR` (e.g., `${HOST_DATA_DIR}/.env`).
+2.  Add your variables to this file (see `.env.sample` for all options or use the examples below). Remember to replace `CHANGEME` values.
+
+**Example Minimal `.env` for OpenVPN:**
 ```ini
 # ---- VPN Settings ----
 VPN_CLIENT=openvpn
-VPN_CONFIG=/config/openvpn/your_provider.ovpn # Path *inside the container*
-VPN_USER=your_vpn_username
-VPN_PASS=your_vpn_password
+VPN_CONFIG=/config/openvpn/your_provider.ovpn # CHANGEME: Path *inside the container* to your .ovpn file
+# VPN_USER=your_vpn_username # CHANGEME (or use credentials.txt)
+# VPN_PASS=your_vpn_password # CHANGEME (or use credentials.txt)
 
 # ---- System Settings ----
-PUID=1000
-PGID=1000
-TZ=America/New_York
+PUID=1000 # CHANGEME
+PGID=1000 # CHANGEME
+TZ=America/New_York # CHANGEME
 
 # ---- NZBGet Server1 Settings (Example) ----
-NZBGET_S1_NAME=MyNewsServer
-NZBGET_S1_HOST=news.example.com
-NZBGET_S1_PORT=563
-NZBGET_S1_USER=server_username
-NZBGET_S1_PASS=server_password
-NZBGET_S1_CONN=10
-NZBGET_S1_SSL=yes # Use 'yes' for SSL, 'no' otherwise
-# NZBGET_S1_LEVEL=0 # Optional: Server level (priority)
-# NZBGET_S1_ENABLED=yes # Server is configured if NZBGET_S1_NAME is set
+NZBGET_S1_NAME=MyNewsServer # CHANGEME
+NZBGET_S1_HOST=news.example.com # CHANGEME
+NZBGET_S1_PORT=563 # CHANGEME
+NZBGET_S1_USER=server_username # CHANGEME
+NZBGET_S1_PASS=server_password # CHANGEME
+NZBGET_S1_CONN=10 # CHANGEME
+NZBGET_S1_SSL=yes # CHANGEME ('yes' for SSL, 'no' otherwise)
+# NZBGET_S1_LEVEL=0 # Optional
 ```
+*(For WireGuard, set `VPN_CLIENT=wireguard` and `VPN_CONFIG=/config/wireguard/your_config.conf`)*
 
-**Minimal `.env` for WireGuard:**
-```ini
-# ---- VPN Settings ----
-VPN_CLIENT=wireguard
-VPN_CONFIG=/config/wireguard/wg0.conf # Path *inside the container*
-
-# ---- System Settings ----
-PUID=1000
-PGID=1000
-TZ=America/New_York
-
-# ---- NZBGet Server1 Settings (Example) ----
-NZBGET_S1_NAME=MyNewsServer
-NZBGET_S1_HOST=news.example.com
-# ... (other NZBGET_S1_* settings as above) ...
-```
-
-**❗️ Important Notes for `.env`:**
-*   `VPN_CONFIG` is the *container's internal path*.
-*   If using `credentials.txt` for OpenVPN, ensure `VPN_USER`/`VPN_PASS` are unset/empty.
-*   The first news server in NZBGet is automatically configured using `NZBGET_S1_*` variables. If `NZBGET_S1_NAME` is set, the server will be configured and active.
-
-**3. Running with `docker run` 🐳**
-
-Adjust `HOST_DATA_DIR` to your actual path.
-
-**Universal Example (OpenVPN or WireGuard based on your `.env`):**
+Then run the container using `--env-file`:
 ```bash
-HOST_DATA_DIR="/opt/nzbgetvpn_data" # Or your preferred path, e.g., "$(pwd)/data"
+HOST_DATA_DIR="/opt/nzbgetvpn_data" # CHANGEME
 
-docker run -d \\
-  --name nzbgetvpn \\
-  --rm \\
-  --cap-add=NET_ADMIN \\
-  # Add these for WireGuard if needed, harmless for OpenVPN:
-  --cap-add=SYS_MODULE \\
-  --sysctl="net.ipv4.conf.all.src_valid_mark=1" \\
-  # --sysctl="net.ipv6.conf.all.disable_ipv6=0" \\ # If using IPv6 with WireGuard
-  --device=/dev/net/tun \\
-  -p 6789:6789 \\ # NZBGet WebUI
-  # -p YOUR_HOST_PRIVOXY_PORT:8118 \\ # Uncomment if ENABLE_PRIVOXY=yes in .env
-  -v "${HOST_DATA_DIR}/config:/config" \\
-  -v "${HOST_DATA_DIR}/downloads:/downloads" \\
-  --env-file "${HOST_DATA_DIR}/.env" \\
+docker run -d \
+  --name nzbgetvpn \
+  --rm \
+  --cap-add=NET_ADMIN \
+  # Add these for WireGuard if using it (based on .env), harmless for OpenVPN:
+  --cap-add=SYS_MODULE \
+  --sysctl="net.ipv4.conf.all.src_valid_mark=1" \
+  # --sysctl="net.ipv6.conf.all.disable_ipv6=0" \
+  --device=/dev/net/tun \
+  -p 6789:6789 \
+  # -p YOUR_HOST_PRIVOXY_PORT:8118 \ # Uncomment if ENABLE_PRIVOXY=yes in .env & set port
+  -v "${HOST_DATA_DIR}/config:/config" \
+  -v "${HOST_DATA_DIR}/downloads:/downloads" \
+  --env-file "${HOST_DATA_DIR}/.env" \
   magicalyak/nzbgetvpn:latest
 ```
-*Remember to set `YOUR_HOST_PRIVOXY_PORT` if enabling Privoxy.*
+*Remember to also set `YOUR_HOST_PRIVOXY_PORT` in the command if you enable Privoxy in your `.env` file and want to map its port.*
 
-**4. Running with Docker Compose ⚙️**
+**4. Using Docker Compose ⚙️**
 
-A `docker-compose.yml` is provided in the repository.
-1.  Copy `docker-compose.yml` and `.env.sample` (rename to `.env`) to your project directory.
-2.  **Edit `docker-compose.yml` volume paths** to match your host system.
-3.  Configure your settings in the `.env` file.
-4.  Run: `docker-compose up -d`
+A `docker-compose.yml` is provided in the repository. It's configured to use an `.env` file in the same directory by default.
 
-**Example `docker-compose.yml` snippet (edit paths!):**
+1.  Copy `docker-compose.yml` and `.env.sample` (rename to `.env`) to your project directory (e.g., `${HOST_DATA_DIR}`).
+2.  **Edit `docker-compose.yml` volume paths if needed.** The defaults (`./config:/config`, `./downloads:/downloads`) assume your `config` and `downloads` directories (from Step 1) are subdirectories of where your `docker-compose.yml` is located. If your `HOST_DATA_DIR` *is* where `docker-compose.yml` resides, and `config` and `downloads` are inside it, the defaults should work.
+3.  Configure your settings in the `.env` file (see example above or `.env.sample`).
+4.  Run from the directory containing `docker-compose.yml` and `.env`: `docker-compose up -d`
+
+**Example `docker-compose.yml` snippet (paths are relative to `docker-compose.yml` location):**
 ```yaml
 version: "3.8"
 
@@ -179,12 +233,13 @@ services:
       - .env # Load environment variables from .env file
     ports:
       - "6789:6789" # NZBGet Web UI
-      # - "YOUR_HOST_PRIVOXY_PORT:8118" # Uncomment if ENABLE_PRIVOXY=yes
+      # - "YOUR_HOST_PRIVOXY_PORT:8118" # Uncomment if ENABLE_PRIVOXY=yes in .env & set port
     volumes:
-      # ‼️ IMPORTANT: Change './data/config' and './data/downloads'
-      # to your actual host paths, e.g., /opt/nzbgetvpn_data/config
-      - ./data/config:/config
-      - ./data/downloads:/downloads
+      # ‼️ IMPORTANT: Adjust host paths if your structure differs.
+      # These examples assume 'config' and 'downloads' folders are
+      # in the same directory as this docker-compose.yml.
+      - ./config:/config
+      - ./downloads:/downloads
     cap_add:
       - NET_ADMIN
       - SYS_MODULE # Good to have for WireGuard, harmless for OpenVPN
@@ -194,17 +249,11 @@ services:
       - net.ipv4.conf.all.src_valid_mark=1
       # - net.ipv6.conf.all.disable_ipv6=0 # If using IPv6
     restart: unless-stopped
-    # healthcheck: # Using built-in healthcheck from Dockerfile
-    #   test: ["CMD", "/root/healthcheck.sh"]
-    #   interval: 1m
-    #   timeout: 10s
-    #   retries: 3
-    #   start_period: 2m
 ```
 
 ## 🔧 Environment Variables
 
-This image uses environment variables for configuration. See `.env.sample` for a full list and descriptions.
+This image uses environment variables for configuration. See `.env.sample` for a full list and descriptions. You can pass these using multiple `-e VARIABLE=value` flags in your `docker run` command, or by using an `.env` file with `docker run --env-file` or with `docker-compose`.
 
 ### Key Variable Groups:
 
