@@ -40,7 +40,7 @@ RUN apk add --no-cache openvpn iptables bash curl iproute2 wireguard-tools privo
 
 # Copy s6-overlay init scripts
 COPY root/etc/cont-init.d/01-ensure-vpn-config-dirs.sh /etc/cont-init.d/01-ensure-vpn-config-dirs
-COPY root/etc/cont-init.d/02-nzbget-news-server.sh /etc/cont-init.d/02-nzbget-news-server
+COPY root/etc/cont-init.d/99-nzbget-news-server-override.sh /etc/cont-init.d/99-nzbget-news-server-override
 COPY root/vpn-setup.sh /etc/cont-init.d/50-vpn-setup
 
 # Copy healthcheck script

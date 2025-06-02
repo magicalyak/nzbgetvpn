@@ -1,0 +1,20 @@
+Mon Jun  2 14:45:43 2025	DETAIL	Failed to get CPU model from '/proc/cpuinfo'
+Mon Jun  2 14:45:43 2025	DETAIL	Failed to get CPU model from 'lscpu'
+Mon Jun  2 14:45:43 2025	ERROR	Could not read configuration templates
+Mon Jun  2 14:45:43 2025	INFO	nzbget 25.0 server-mode
+Mon Jun  2 14:45:43 2025	INFO	using /config/nzbget.conf
+Mon Jun  2 14:45:43 2025	INFO	nzbget runs on 0.0.0.0:6789
+Mon Jun  2 15:04:30 2025	INFO	Stopping, please wait...
+Mon Jun  2 15:04:39 2025	DETAIL	Failed to get CPU model from '/proc/cpuinfo'
+Mon Jun  2 15:04:39 2025	DETAIL	Failed to get CPU model from 'lscpu'
+Mon Jun  2 15:04:39 2025	ERROR	Could not read configuration templates
+Mon Jun  2 15:04:39 2025	INFO	nzbget 25.0 server-mode
+Mon Jun  2 15:04:39 2025	INFO	using /config/nzbget.conf
+Mon Jun  2 15:04:39 2025	INFO	nzbget runs on 0.0.0.0:6789
+Mon Jun  2 15:16:48 2025	INFO	Stopping, please wait...
+Mon Jun  2 15:17:00 2025	DETAIL	Failed to get CPU model from '/proc/cpuinfo'
+Mon Jun  2 15:17:00 2025	DETAIL	Failed to get CPU model from 'lscpu'
+Mon Jun  2 15:17:00 2025	ERROR	Could not read configuration templates
+Mon Jun  2 15:17:00 2025	INFO	nzbget 25.0 server-mode
+Mon Jun  2 15:17:00 2025	INFO	using /config/nzbget.conf
+Mon Jun  2 15:17:00 2025	INFO	nzbget runs on 0.0.0.0:6789
