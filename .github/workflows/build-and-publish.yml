@@ -305,10 +305,36 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Validate Docker Hub credentials
+        id: validate-creds
+        run: |
+          if [[ -z "${{ secrets.DOCKERHUB_USERNAME }}" ]]; then
+            echo "❌ DOCKERHUB_USERNAME secret is not set"
+            echo "has-creds=false" >> $GITHUB_OUTPUT
+          elif [[ -z "${{ secrets.DOCKERHUB_TOKEN }}" ]]; then
+            echo "❌ DOCKERHUB_TOKEN secret is not set"
+            echo "has-creds=false" >> $GITHUB_OUTPUT
+          else
+            echo "✅ Docker Hub credentials are configured"
+            echo "has-creds=true" >> $GITHUB_OUTPUT
+          fi
+
       - name: Update Docker Hub README
+        if: steps.validate-creds.outputs.has-creds == 'true'
         uses: peter-evans/dockerhub-description@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           repository: ${{ env.IMAGE_NAME }}
           readme-filepath: ./README.md
+        continue-on-error: true
+
+      - name: README update status
+        run: |
+          if [[ "${{ steps.validate-creds.outputs.has-creds }}" == "false" ]]; then
+            echo "⚠️ Docker Hub README update skipped due to missing credentials"
+            echo "Please check repository secrets: DOCKERHUB_USERNAME and DOCKERHUB_TOKEN"
+          else
+            echo "✅ Docker Hub README update attempted"
+            echo "If it failed, check Docker Hub token permissions and expiration"
+          fi
