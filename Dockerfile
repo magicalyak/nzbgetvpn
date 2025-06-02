@@ -1,6 +1,13 @@
+# Multi-architecture Dockerfile for nzbgetvpn
+# Supports: linux/amd64, linux/arm64
+
 FROM ghcr.io/linuxserver/nzbget:latest
 
-# ENV NZBGET_VERSION=25.0
+# Build arguments for multi-architecture support
+ARG BUILDPLATFORM
+ARG TARGETPLATFORM
+ARG TARGETOS
+ARG TARGETARCH
 
 # Add ARG for VPN credentials
 ARG VPN_USER
@@ -34,30 +41,113 @@ ENV NZBGET_S1_SSL=${NZBGET_S1_SSL:-}
 ENV NZBGET_S1_LEVEL=${NZBGET_S1_LEVEL:-0}
 ENV NZBGET_S1_ENABLED=${NZBGET_S1_ENABLED:-yes}
 
-# Install OpenVPN, WireGuard, Privoxy and tools
-RUN apk add --no-cache openvpn iptables bash curl iproute2 wireguard-tools privoxy && \
-    for f in /etc/privoxy/*.new; do mv -n "$f" "${f%.new}"; done
+# Monitoring and Auto-restart ENV
+ENV ENABLE_MONITORING=${ENABLE_MONITORING:-yes}
+ENV MONITORING_PORT=${MONITORING_PORT:-8080}
+ENV MONITORING_LOG_LEVEL=${MONITORING_LOG_LEVEL:-INFO}
+ENV ENABLE_AUTO_RESTART=${ENABLE_AUTO_RESTART:-false}
+ENV RESTART_COOLDOWN_SECONDS=${RESTART_COOLDOWN_SECONDS:-300}
+ENV MAX_RESTART_ATTEMPTS=${MAX_RESTART_ATTEMPTS:-3}
+ENV RESTART_ON_VPN_FAILURE=${RESTART_ON_VPN_FAILURE:-true}
+ENV RESTART_ON_NZBGET_FAILURE=${RESTART_ON_NZBGET_FAILURE:-true}
+ENV DISABLE_IP_LEAK_CHECK=${DISABLE_IP_LEAK_CHECK:-false}
+ENV VPN_NETWORK=${VPN_NETWORK:-}
+ENV NOTIFICATION_WEBHOOK_URL=${NOTIFICATION_WEBHOOK_URL:-}
+
+# Platform information (for runtime detection)
+ENV BUILDPLATFORM=${BUILDPLATFORM}
+ENV TARGETPLATFORM=${TARGETPLATFORM}
+ENV TARGETARCH=${TARGETARCH}
+
+# Display build information
+RUN echo "Building for platform: ${TARGETPLATFORM:-unknown}" && \
+    echo "Target architecture: ${TARGETARCH:-unknown}" && \
+    echo "Build platform: ${BUILDPLATFORM:-unknown}"
+
+# Install OpenVPN, WireGuard, Privoxy, Python3, jq, bc and tools
+# Include platform-specific optimizations
+RUN apk add --no-cache \
+    openvpn \
+    iptables \
+    bash \
+    curl \
+    iproute2 \
+    wireguard-tools \
+    privoxy \
+    python3 \
+    jq \
+    bc \
+    # Platform-specific packages
+    $(if [ "${TARGETARCH}" = "arm64" ]; then echo "arm64-specific-tools"; fi) \
+    && for f in /etc/privoxy/*.new; do mv -n "$f" "${f%.new}"; done
+
+# Platform-specific optimizations
+RUN case "${TARGETARCH}" in \
+    "arm64") \
+        echo "Applying ARM64 optimizations..." && \
+        # ARM64-specific optimizations
+        echo "net.core.rmem_max = 16777216" >> /etc/sysctl.conf && \
+        echo "net.core.wmem_max = 16777216" >> /etc/sysctl.conf && \
+        echo "ARM64 optimizations applied" \
+        ;; \
+    "amd64") \
+        echo "Applying AMD64 optimizations..." && \
+        # AMD64-specific optimizations
+        echo "AMD64 optimizations applied" \
+        ;; \
+    *) \
+        echo "Using default configuration for architecture: ${TARGETARCH}" \
+        ;; \
+    esac
 
 # Copy s6-overlay init scripts
 COPY root/etc/cont-init.d/01-ensure-vpn-config-dirs.sh /etc/cont-init.d/01-ensure-vpn-config-dirs
 COPY root/etc/cont-init.d/99-nzbget-news-server-override.sh /etc/cont-init.d/99-nzbget-news-server-override
 COPY root/vpn-setup.sh /etc/cont-init.d/50-vpn-setup
 
-# Copy healthcheck script
+# Copy enhanced healthcheck and monitoring scripts
 COPY root/healthcheck.sh /root/healthcheck.sh
+COPY root/monitoring-server.py /root/monitoring-server.py
+COPY root/auto-restart.sh /root/auto-restart.sh
+
+# Copy architecture detection script
+COPY root/platform-info.sh /root/platform-info.sh
 
 # Copy Privoxy configuration template and s6 service files
 COPY config/privoxy/config /etc/privoxy/config.template
 COPY root_s6/privoxy/run /etc/s6-overlay/s6-rc.d/privoxy/run
+COPY root_s6/monitoring/run /etc/s6-overlay/s6-rc.d/monitoring/run
+COPY root_s6/auto-restart/run /etc/s6-overlay/s6-rc.d/auto-restart/run
+
+# Setup s6-overlay services
 RUN mkdir -p /etc/s6-overlay/s6-rc.d/user/contents.d && \
     echo "longrun" > /etc/s6-overlay/s6-rc.d/privoxy/type && \
-    touch /etc/s6-overlay/s6-rc.d/user/contents.d/privoxy
+    echo "longrun" > /etc/s6-overlay/s6-rc.d/monitoring/type && \
+    echo "longrun" > /etc/s6-overlay/s6-rc.d/auto-restart/type && \
+    touch /etc/s6-overlay/s6-rc.d/user/contents.d/privoxy && \
+    touch /etc/s6-overlay/s6-rc.d/user/contents.d/monitoring && \
+    touch /etc/s6-overlay/s6-rc.d/user/contents.d/auto-restart
 
 # Make scripts executable
-RUN chmod +x /etc/cont-init.d/* /root/healthcheck.sh /etc/s6-overlay/s6-rc.d/privoxy/run
+RUN chmod +x /etc/cont-init.d/* /root/healthcheck.sh /root/monitoring-server.py /root/auto-restart.sh \
+    /root/platform-info.sh /etc/s6-overlay/s6-rc.d/privoxy/run /etc/s6-overlay/s6-rc.d/monitoring/run \
+    /etc/s6-overlay/s6-rc.d/auto-restart/run
 
-# Healthcheck
-HEALTHCHECK --interval=1m --timeout=10s --start-period=2m --retries=3 \
+# Enhanced healthcheck with more frequent checks and longer timeout for monitoring features
+HEALTHCHECK --interval=30s --timeout=15s --start-period=2m --retries=3 \
   CMD /root/healthcheck.sh
+
+# Expose monitoring port (optional, can be mapped in docker run/compose)
+EXPOSE 8080
+
+# Add build information labels
+LABEL org.opencontainers.image.title="nzbgetvpn" \
+      org.opencontainers.image.description="NZBGet with VPN integration - Multi-architecture support" \
+      org.opencontainers.image.vendor="magicalyak" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.source="https://github.com/magicalyak/nzbgetvpn" \
+      org.opencontainers.image.documentation="https://github.com/magicalyak/nzbgetvpn/blob/main/README.md" \
+      org.opencontainers.image.platform="${TARGETPLATFORM}" \
+      org.opencontainers.image.architecture="${TARGETARCH}"
 
 # CMD is inherited from linuxserver base

@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+# s6-overlay service for auto-restart monitoring
+
+# Only start auto-restart if enabled
+if [[ "${ENABLE_AUTO_RESTART:-false}" != "true" ]]; then
+    echo "Auto-restart disabled via ENABLE_AUTO_RESTART environment variable"
+    # Sleep forever to keep service "running" but inactive
+    exec sleep infinity
+fi
+
+echo "Starting nzbgetvpn auto-restart monitor"
+
+# Run the auto-restart monitor
+exec /root/auto-restart.sh 

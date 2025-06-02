@@ -1,5 +1,7 @@
+# Makefile for nzbgetvpn development
+
 IMAGE_NAME ?= nzbgetvpn
-CONTAINER_NAME ?= nzbgetvpn-container
+CONTAINER_NAME ?= nzbgetvpn-dev
 
 # Attempt to read PRIVOXY_PORT from .env file, default to 8118 if not found or .env is missing
 # This ensures PRIVOXY_HOST_PORT aligns with the internal PRIVOXY_PORT set in .env
@@ -7,86 +9,64 @@ PRIVOXY_PORT_FROM_ENV := $(shell if [ -f .env ]; then grep '^PRIVOXY_PORT=' .env
 PRIVOXY_HOST_PORT ?= $(PRIVOXY_PORT_FROM_ENV)
 PRIVOXY_HOST_PORT ?= 8118 # Fallback if not in .env or .env doesn't exist
 
-.PHONY: all build run run-openvpn run-wireguard logs stop shell clean help
+.PHONY: all build test run logs stop clean help
 
-all: build
+all: help
 
 help:
+	@echo "nzbgetvpn Development Makefile"
+	@echo ""
 	@echo "Usage: make [target]"
 	@echo ""
-	@echo "Targets:"
-	@echo "  all                Build the Docker image (default)."
-	@echo "  build              Build the Docker image."
-	@echo "  run                Run the Docker container with OpenVPN (example, edit .env first)."
-	@echo "  run-openvpn        Alias for 'run'."
-	@echo "  run-wireguard      Run the Docker container with WireGuard (example, edit .env and WireGuard config)."
-	@echo "  logs               Follow logs of the running container."
-	@echo "  stop               Stop and remove the running container."
-	@echo "  shell              Get a shell inside the running container."
-	@echo "  clean              Remove stopped containers and the Docker image."
+	@echo "Development targets:"
+	@echo "  build              Build the Docker image locally"
+	@echo "  test               Run basic tests on the built image"
+	@echo "  run                Run container for testing (requires .env)"
+	@echo "  logs               Follow container logs"
+	@echo "  stop               Stop and remove container"
+	@echo "  clean              Clean up containers and images"
+	@echo ""
+	@echo "For normal usage, see README.md Quick Start section"
 
 build:
-	@echo "Building Docker image $(IMAGE_NAME)..."
+	@echo "Building Docker image: $(IMAGE_NAME)"
 	docker build -t $(IMAGE_NAME) .
 
-run: run-openvpn
+test: build
+	@echo "Testing image: $(IMAGE_NAME)"
+	@docker run --rm $(IMAGE_NAME) python3 --version
+	@docker run --rm $(IMAGE_NAME) openvpn --version | head -1
+	@docker run --rm $(IMAGE_NAME) wg --version
+	@echo "✅ Basic tests passed"
 
-run-openvpn:
-	@echo "Running container $(CONTAINER_NAME) with OpenVPN..."
-	@echo "Ensure your .env file has VPN_USER, VPN_PASS, and VPN_CONFIG set correctly."
-	@echo "VPN_CONFIG should point to an .ovpn file in ./config/openvpn/"
+run:
+	@if [ ! -f .env ]; then \
+		echo "❌ .env file not found. Copy .env.sample to .env and configure it first."; \
+		exit 1; \
+	fi
+	@echo "Running development container: $(CONTAINER_NAME)"
+	@mkdir -p config downloads
 	docker run -d \
 		--name $(CONTAINER_NAME) \
-		--rm \
 		--cap-add=NET_ADMIN \
 		--device=/dev/net/tun \
 		-p 6789:6789 \
-		-p $(PRIVOXY_HOST_PORT):$(PRIVOXY_HOST_PORT) \
-		-v "$(shell pwd)/config/openvpn:/config/openvpn" \
-		-v "$(shell pwd)/downloads:/downloads" \
+		-p 8080:8080 \
+		-v $(PWD)/config:/config \
+		-v $(PWD)/downloads:/downloads \
 		--env-file .env \
-		-e VPN_CLIENT=openvpn \
 		$(IMAGE_NAME)
-
-run-wireguard:
-	@echo "Running container $(CONTAINER_NAME) with WireGuard..."
-	@echo "Ensure your .env file has WG_CONFIG_FILE set (e.g., /config/wireguard/wg0.conf)."
-	@echo "And that the actual WireGuard config (e.g., wg0.conf) exists in ./config/wireguard/"
-	docker run -d \
-		--name $(CONTAINER_NAME) \
-		--rm \
-		--cap-add=NET_ADMIN \
-		--cap-add=SYS_MODULE \
-		--sysctl="net.ipv4.conf.all.src_valid_mark=1" \
-		--sysctl="net.ipv6.conf.all.disable_ipv6=0" \
-		--device=/dev/net/tun \
-		-p 6789:6789 \
-		-p $(PRIVOXY_HOST_PORT):$(PRIVOXY_HOST_PORT) \
-		-v "$(shell pwd)/config/wireguard:/config/wireguard" \
-		-v "$(shell pwd)/downloads:/downloads" \
-		--env-file .env \
-		-e VPN_CLIENT=wireguard \
-		$(IMAGE_NAME)
+	@echo "✅ Container started. Access NZBGet at http://localhost:6789"
 
 logs:
-	@echo "Following logs for $(CONTAINER_NAME)..."
-	docker logs -f $(CONTAINER_NAME)
+	@docker logs -f $(CONTAINER_NAME)
 
 stop:
-	@echo "Stopping and removing $(CONTAINER_NAME)..."
-	docker stop $(CONTAINER_NAME) || true
-	docker rm -f $(CONTAINER_NAME) || true
+	@echo "Stopping container: $(CONTAINER_NAME)"
+	@docker stop $(CONTAINER_NAME) 2>/dev/null || true
+	@docker rm -f $(CONTAINER_NAME) 2>/dev/null || true
 
-shell:
-	@echo "Opening shell in $(CONTAINER_NAME)..."
-	docker exec -it $(CONTAINER_NAME) /bin/bash
-
-clean:
+clean: stop
 	@echo "Cleaning up..."
-	docker stop $(CONTAINER_NAME) || true 
-	# docker rm $(CONTAINER_NAME) || true # Not needed due to --rm
-	@read -p "Remove Docker image $(IMAGE_NAME)? [y/N] " choice; \
-	case "$$choice" in \
-	  y|Y ) docker rmi $(IMAGE_NAME) || true;; \
-	  * ) echo "Skipping image removal.";; \
-	esac
+	@docker system prune -f
+	@echo "✅ Cleanup complete"

@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+# s6-overlay service for nzbgetvpn monitoring server
+
+# Only start monitoring server if enabled
+if [[ "${ENABLE_MONITORING:-yes}" != "yes" ]]; then
+    echo "Monitoring server disabled via ENABLE_MONITORING environment variable"
+    exit 0
+fi
+
+# Ensure Python is available
+if ! command -v python3 &> /dev/null; then
+    echo "Python3 not available, monitoring server cannot start"
+    exit 1
+fi
+
+# Create monitoring log directory
+mkdir -p /config
+
+# Export environment variables for the monitoring server
+export MONITORING_PORT="${MONITORING_PORT:-8080}"
+export MONITORING_LOG_LEVEL="${MONITORING_LOG_LEVEL:-INFO}"
+
+echo "Starting nzbgetvpn monitoring server on port ${MONITORING_PORT}"
+
+# Run the monitoring server
+exec python3 /root/monitoring-server.py 

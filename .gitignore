@@ -1,15 +1,66 @@
+# User credentials and sensitive data
 nzbgetvpn_dockerrun.txt
-config/openvpn/credentials # Or any other path to your actual credentials file
+config/openvpn/credentials*
+config/wireguard/*.conf
 .env
-.cursorignore
-logs/
+.env.local
+.env.*.local
 openvpn-credentials.txt
-.github/.DS_Store
-
-# Test data and environment files
-./test_data/
-test.env
 
 # User-specific data directories if mapped to project root
 downloads/
 nzbget_config/
+logs/
+
+# Test data and environment files
+test_data/
+test.env
+*.tmp
+
+# macOS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.sublime-*
+
+# Docker development
+docker-compose.override.yml
+docker-compose.local.yml
+.dockerignore.local
+
+# Build artifacts
+*.tar
+*.tar.gz
+*.zip
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Temporary files
+*.log
+*.pid
+*.seed
+*.pid.lock
+*.coverage
+.tmp/
+temp/
+
+# Platform specific
+.cursorignore
+
+# Local development overrides
+scripts/local-*
+scripts/*.local
+config.local.*

@@ -1,0 +1,139 @@
+name: ❓ Question or Help
+description: Ask a question about setup, configuration, or usage
+title: "[QUESTION] "
+labels: ["question", "help wanted"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Need help with nzbgetvpn? Please provide as much detail as possible so we can assist you effectively.
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission Checklist
+      description: Please verify these items before asking your question
+      options:
+        - label: I have searched existing issues for similar questions
+          required: true
+        - label: I have read the README.md documentation thoroughly
+          required: true
+        - label: I have checked the container logs for error messages
+          required: true
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Your Question
+      description: What would you like help with?
+      placeholder: "Ask your question here. Be as specific as possible..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Question Category
+      description: What area does your question relate to?
+      options:
+        - Initial Setup & Installation
+        - VPN Configuration (OpenVPN)
+        - VPN Configuration (WireGuard)
+        - NZBGet Configuration
+        - Docker / Docker Compose
+        - Networking Issues
+        - Performance Issues
+        - Troubleshooting
+        - Best Practices
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: vpn-type
+    attributes:
+      label: VPN Type (if applicable)
+      description: Which VPN protocol are you trying to use?
+      options:
+        - Not applicable
+        - OpenVPN
+        - WireGuard
+        - Both
+
+  - type: input
+    id: vpn-provider
+    attributes:
+      label: VPN Provider (if applicable)
+      description: Which VPN provider are you using?
+      placeholder: "Example: NordVPN, ExpressVPN, Surfshark, etc."
+
+  - type: textarea
+    id: configuration
+    attributes:
+      label: Current Configuration
+      description: Share your docker-compose.yml or docker run command (redact sensitive information)
+      render: yaml
+      placeholder: |
+        version: '3.8'
+        services:
+          nzbgetvpn:
+            image: your/nzbgetvpn:latest
+            environment:
+              - VPN_TYPE=openvpn
+              # ... other settings (redact passwords/keys)
+
+  - type: textarea
+    id: what-tried
+    attributes:
+      label: What Have You Tried?
+      description: What steps have you already taken to solve this?
+      placeholder: |
+        1. Tried configuration option X
+        2. Checked logs and saw Y
+        3. Searched documentation for Z
+        etc.
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs (if applicable)
+      description: Any relevant log output
+      render: text
+      placeholder: |
+        Paste relevant log snippets here. Get logs with:
+        docker logs <container-name>
+        or
+        docker-compose logs nzbgetvpn
+
+  - type: input
+    id: version
+    attributes:
+      label: nzbgetvpn Version
+      description: Which version/tag are you using?
+      placeholder: "Example: v25.0.20 or latest"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      description: What platform are you running on?
+      options:
+        - Linux (x86_64)
+        - Linux (ARM64)
+        - macOS (Intel)
+        - macOS (Apple Silicon)
+        - Windows (with WSL2)
+        - Windows (Docker Desktop)
+        - Synology NAS
+        - QNAP NAS
+        - Other (specify below)
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Any other relevant information
+      placeholder: "Network setup, special requirements, error messages, etc." 

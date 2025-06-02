@@ -1,0 +1,144 @@
+name: 🐛 Bug Report
+description: Report a bug or issue with nzbgetvpn
+title: "[BUG] "
+labels: ["bug", "triage"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out the information below to help us diagnose the issue.
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission Checklist
+      description: Please verify these items before submitting your bug report
+      options:
+        - label: I have searched existing issues to ensure this is not a duplicate
+          required: true
+        - label: I have read the README.md documentation
+          required: true
+        - label: I have checked the logs for error messages
+          required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is
+      placeholder: Describe the issue you're experiencing...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Steps to reproduce the behavior
+      placeholder: |
+        1. Set up container with...
+        2. Configure VPN with...
+        3. Run command '...'
+        4. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What you expected to happen
+      placeholder: Describe what should have happened...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: vpn-type
+    attributes:
+      label: VPN Type
+      description: Which VPN protocol are you using?
+      options:
+        - OpenVPN
+        - WireGuard
+        - Both
+        - Not applicable
+    validations:
+      required: true
+
+  - type: input
+    id: vpn-provider
+    attributes:
+      label: VPN Provider
+      description: Which VPN provider are you using? (e.g., NordVPN, ExpressVPN, Surfshark, etc.)
+      placeholder: "Example: NordVPN"
+
+  - type: textarea
+    id: docker-compose
+    attributes:
+      label: Docker Compose Configuration
+      description: Your docker-compose.yml or docker run command (please redact sensitive information)
+      render: yaml
+      placeholder: |
+        version: '3.8'
+        services:
+          nzbgetvpn:
+            image: your/nzbgetvpn:latest
+            # ... rest of your config (redact passwords/keys)
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment Variables
+      description: Relevant environment variables (please redact sensitive values)
+      render: bash
+      placeholder: |
+        VPN_TYPE=openvpn
+        VPN_CONFIG_FILE=provider.ovpn
+        # ... other relevant env vars (redact sensitive values)
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Container Logs
+      description: Relevant log output from the container
+      render: text
+      placeholder: |
+        Paste relevant log output here. You can get logs with:
+        docker logs <container-name>
+        or
+        docker-compose logs nzbgetvpn
+
+  - type: input
+    id: version
+    attributes:
+      label: nzbgetvpn Version
+      description: Which version/tag are you using?
+      placeholder: "Example: v25.0.20 or latest"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      description: What platform are you running on?
+      options:
+        - Linux (x86_64)
+        - Linux (ARM64)
+        - macOS (Intel)
+        - macOS (Apple Silicon)
+        - Windows (with WSL2)
+        - Windows (Docker Desktop)
+        - Synology NAS
+        - QNAP NAS
+        - Other (specify in additional context)
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Any other context about the problem
+      placeholder: Add any other context, screenshots, or additional information here... 

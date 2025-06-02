@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📚 Documentation
+    url: https://github.com/magicalyak/nzbgetvpn/blob/main/README.md
+    about: Check the comprehensive README for setup instructions and troubleshooting
+  - name: 💬 Discussions
+    url: https://github.com/magicalyak/nzbgetvpn/discussions
+    about: Ask questions, share configurations, and discuss with the community
+  - name: 🐳 Docker Hub
+    url: https://hub.docker.com/r/magicalyak/nzbgetvpn
+    about: View the official Docker images and tags 
