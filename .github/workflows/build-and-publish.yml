@@ -52,6 +52,23 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Check if tag is on main branch
+        id: check_tag_on_main
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          # Check if the tag points to a commit that is an ancestor of main
+          # git merge-base --is-ancestor <commit> <ref> exits 0 if true, 1 if false
+          # We use github.ref_name for the tag
+          # We need to fetch main to ensure we have its latest state
+          git fetch origin main
+          if git merge-base --is-ancestor ${{ github.ref_name }} origin/main; then
+            echo "Tag ${{ github.ref_name }} is on main branch."
+            echo "is_on_main=true" >> $GITHUB_OUTPUT
+          else
+            echo "Tag ${{ github.ref_name }} is NOT on main branch."
+            echo "is_on_main=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -65,10 +82,10 @@ jobs:
             type=sha,format=short,prefix=sha-,enable=${{ github.ref == 'refs/heads/main' }}
 
             # For Git tag pushes (e.g., v1.2.3)
-            type=semver,pattern={{version}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
-            type=semver,pattern={{major}}.{{minor}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
-            type=semver,pattern={{major}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
-            type=ref,event=tag,enable=${{ startsWith(github.ref, 'refs/tags/v') }} # Adds the tag itself, e.g., v1.2.3
+            type=semver,pattern={{version}},enable=${{ startsWith(github.ref, 'refs/tags/v') && steps.check_tag_on_main.outputs.is_on_main == 'true' }}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ startsWith(github.ref, 'refs/tags/v') && steps.check_tag_on_main.outputs.is_on_main == 'true' }}
+            type=semver,pattern={{major}},enable=${{ startsWith(github.ref, 'refs/tags/v') && steps.check_tag_on_main.outputs.is_on_main == 'true' }}
+            type=ref,event=tag,enable=${{ startsWith(github.ref, 'refs/tags/v') && steps.check_tag_on_main.outputs.is_on_main == 'true' }} # Adds the tag itself, e.g., v1.2.3
           flavor: |
             latest=auto
 
