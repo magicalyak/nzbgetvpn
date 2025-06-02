@@ -23,12 +23,24 @@ ENV LAN_NETWORK=${LAN_NETWORK:-}
 ENV ADDITIONAL_PORTS=${ADDITIONAL_PORTS:-}
 ENV PRIVOXY_PORT=${PRIVOXY_PORT:-8118}
 
+# NZBGet Server1 Configuration ENV (populated by 02-nzbget-news-server.sh)
+ENV NZBGET_S1_NAME=${NZBGET_S1_NAME:-}
+ENV NZBGET_S1_HOST=${NZBGET_S1_HOST:-}
+ENV NZBGET_S1_PORT=${NZBGET_S1_PORT:-}
+ENV NZBGET_S1_USER=${NZBGET_S1_USER:-}
+ENV NZBGET_S1_PASS=${NZBGET_S1_PASS:-}
+ENV NZBGET_S1_CONN=${NZBGET_S1_CONN:-}
+ENV NZBGET_S1_SSL=${NZBGET_S1_SSL:-}
+ENV NZBGET_S1_LEVEL=${NZBGET_S1_LEVEL:-0}
+ENV NZBGET_S1_ENABLED=${NZBGET_S1_ENABLED:-yes}
+
 # Install OpenVPN, WireGuard, Privoxy and tools
 RUN apk add --no-cache openvpn iptables bash curl iproute2 wireguard-tools privoxy && \
     for f in /etc/privoxy/*.new; do mv -n "$f" "${f%.new}"; done
 
 # Copy s6-overlay init scripts
 COPY root/etc/cont-init.d/01-ensure-vpn-config-dirs.sh /etc/cont-init.d/01-ensure-vpn-config-dirs
+COPY root/etc/cont-init.d/02-nzbget-news-server.sh /etc/cont-init.d/02-nzbget-news-server
 COPY root/vpn-setup.sh /etc/cont-init.d/50-vpn-setup
 
 # Copy healthcheck script

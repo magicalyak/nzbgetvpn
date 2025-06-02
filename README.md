@@ -44,7 +44,6 @@ Properly mapping volumes is crucial for data persistence and custom configuratio
 │   │   └── your_provider.ovpn
 │   │   └── credentials.txt  # Optional: user on L1, pass on L2
 │   │   └── ca.crt         # And any other certs/keys
-│   ├── wireguard/         # For WireGuard files
 │   │   └── wg0.conf
 └── downloads/             # Maps to /downloads in container
     ├── movies/            # (NZBGet might create these, or you can)
@@ -55,26 +54,40 @@ Properly mapping volumes is crucial for data persistence and custom configuratio
 *   Host directory previously for `/data` (downloads) ➡️ Map to **`/downloads`**.
 *   Host directory previously for `/config` (NZBGet settings & VPN files) ➡️ Map to **`/config`**. Ensure VPN files are in `openvpn/` or `wireguard/` subfolders. For credentials, use `openvpn/credentials.txt`.
 
-## 🚀 Getting Started: Quick Launch Guide
+## 🚀 Quick Start Guide
 
 This guide focuses on running the pre-built `magicalyak/nzbgetvpn` image from Docker Hub.
 
 **1. Prepare Your Docker Host System 🛠️**
 
-Create your configuration and downloads directories on your Docker host (as shown in "💾 Volume Mapping"). Example:
+Before running the container for the first time, it's highly recommended to create the necessary directory structure on your Docker host. While Docker *can* sometimes create missing host paths for volume mounts, doing so manually ensures correct ownership and provides a clear place for your essential VPN configuration files.
+
+*   **Why pre-create directories?**
+    *   **Permissions:** If Docker auto-creates directories, they are owned by `root`. This often causes permission issues when NZBGet (running with `PUID`/`PGID` from your `.env` file) tries to write data. Creating them yourself allows you to set the correct ownership, which the container will then respect via `PUID`/`PGID`.
+    *   **VPN Configuration:** Your VPN client configuration files (`.ovpn`, `credentials.txt`, `.conf`) *must* exist in the designated subfolders (`config/openvpn/` or `config/wireguard/`) *before* the container starts so they can be mounted correctly.
+    *   **Control:** You have explicit control over your data storage locations.
+
+Create your base configuration and downloads directories. Example:
 ```bash
-# Create base directory (choose your own path!)
+# Choose your base directory on the host (e.g., /opt/nzbgetvpn_data or ~/nzbgetvpn_data)
 HOST_DATA_DIR="/opt/nzbgetvpn_data"
 
+# Create the main config and downloads directories
+mkdir -p "${HOST_DATA_DIR}/config"
+mkdir -p "${HOST_DATA_DIR}/downloads"
+
+# Create subdirectories for VPN configurations
 mkdir -p "${HOST_DATA_DIR}/config/openvpn"
 mkdir -p "${HOST_DATA_DIR}/config/wireguard"
-mkdir -p "${HOST_DATA_DIR}/downloads"
+
+echo "Host directories created under ${HOST_DATA_DIR}"
+# Important: Ensure the user/group that will run the 'docker run' command (or Docker daemon user)
+# has appropriate permissions for these directories, or adjust PUID/PGID in your .env file accordingly.
 ```
 
 Place your VPN configuration files into the appropriate subfolders on your host:
-*   OpenVPN Config: e.g., `${HOST_DATA_DIR}/config/openvpn/your_provider.ovpn`
-*   OpenVPN Credentials (if using file method): Create `${HOST_DATA_DIR}/config/openvpn/credentials.txt` (user L1, pass L2).
-*   WireGuard Config: e.g., `${HOST_DATA_DIR}/config/wireguard/wg0.conf`
+*   OpenVPN Config & Credentials: e.g., `${HOST_DATA_DIR}/config/openvpn/your_provider.ovpn` and optionally `${HOST_DATA_DIR}/config/openvpn/credentials.txt`.
+*   WireGuard Config: e.g., `${HOST_DATA_DIR}/config/wireguard/wg0.conf`.
 
 **2. Create Your `.env` Configuration File 📝**
 
@@ -128,30 +141,134 @@ TZ=America/New_York # Set to your timezone!
 *   Set `PUID`, `PGID`, and `TZ` to match your system and preferences.
 *   Consult `.env.sample` for all available environment variables.
 
-**3. Run the Container! 🐳**
+**3. Running with `docker run` 🐳**
 
-Use the following command, adjusting paths to your `.env` file and host directories.
+Choose the example that best fits your needs. Remember to adjust `HOST_DATA_DIR` to your actual host path where your `.env` file, VPN configurations, and downloads will reside.
+
+**Minimal OpenVPN Example:**
+
+This example assumes your `.env` file is configured for OpenVPN (e.g., `VPN_CLIENT=openvpn` and `VPN_CONFIG`, `VPN_USER`, `VPN_PASS` are set).
 
 ```bash
 # Define your host data directory (must match where you put config and downloads)
-HOST_DATA_DIR="/opt/nzbgetvpn_data"
+HOST_DATA_DIR="/opt/nzbgetvpn_data" # Or your preferred path, e.g., "$(pwd)/data"
 
 docker run -d \
   --name nzbgetvpn \
   --rm \
   --cap-add=NET_ADMIN \
-  # --cap-add=SYS_MODULE \ # Add for WireGuard if kernel module loading is needed
-  # --sysctl="net.ipv4.conf.all.src_valid_mark=1" \ # Add for WireGuard
-  # --sysctl="net.ipv6.conf.all.disable_ipv6=0" \  # Add for WireGuard if using IPv6
   --device=/dev/net/tun \
   -p 6789:6789 \
-  # -p 8118:8118 \  # Uncomment if ENABLE_PRIVOXY=yes and you want to map it
   -v "${HOST_DATA_DIR}/config:/config" \
   -v "${HOST_DATA_DIR}/downloads:/downloads" \
   --env-file "${HOST_DATA_DIR}/.env" \
   magicalyak/nzbgetvpn:latest
 ```
-*Tip: For WireGuard, you might need `--cap-add=SYS_MODULE` and relevant `--sysctl` flags if not already handled by your system. The `Makefile` includes these in its WireGuard example.*
+
+**Minimal WireGuard Example:**
+
+This example assumes your `.env` file is configured for WireGuard (e.g., `VPN_CLIENT=wireguard` and `VPN_CONFIG` is set to your WireGuard config file like `/config/wireguard/wg0.conf`).
+
+```bash
+# Define your host data directory
+HOST_DATA_DIR="/opt/nzbgetvpn_data" # Or your preferred path
+
+docker run -d \
+  --name nzbgetvpn \
+  --rm \
+  --cap-add=NET_ADMIN \
+  --cap-add=SYS_MODULE \ # May be needed for WireGuard kernel module
+  --sysctl="net.ipv4.conf.all.src_valid_mark=1" \ # Recommended for WireGuard
+  # --sysctl="net.ipv6.conf.all.disable_ipv6=0" \ # Uncomment if using IPv6 with WireGuard
+  --device=/dev/net/tun \
+  -p 6789:6789 \
+  -v "${HOST_DATA_DIR}/config:/config" \
+  -v "${HOST_DATA_DIR}/downloads:/downloads" \
+  --env-file "${HOST_DATA_DIR}/.env" \
+  magicalyak/nzbgetvpn:latest
+```
+
+**Recommended OpenVPN Example:**
+
+This includes common settings like `PUID`/`PGID` (set in your `.env` file), `TZ`, and mapping the Privoxy port (if you intend to use it).
+
+```bash
+# Define your host data directory
+HOST_DATA_DIR="/opt/nzbgetvpn_data" # Or your preferred path
+
+docker run -d \
+  --name nzbgetvpn \
+  --rm \
+  --cap-add=NET_ADMIN \
+  --device=/dev/net/tun \
+  -p 6789:6789 \
+  # -p YOUR_HOST_PRIVOXY_PORT:8118 \ # Uncomment and set host port if ENABLE_PRIVOXY=yes in .env
+  -v "${HOST_DATA_DIR}/config:/config" \
+  -v "${HOST_DATA_DIR}/downloads:/downloads" \
+  --env-file "${HOST_DATA_DIR}/.env" \
+  # Ensure PUID, PGID, and TZ are set in your .env file
+  magicalyak/nzbgetvpn:latest
+```
+*For `YOUR_HOST_PRIVOXY_PORT`, choose an available port on your Docker host, e.g., `8118`.*
+
+**Recommended WireGuard Example:**
+
+Similar to the recommended OpenVPN example, but with WireGuard-specific capabilities and sysctl settings.
+
+```bash
+# Define your host data directory
+HOST_DATA_DIR="/opt/nzbgetvpn_data" # Or your preferred path
+
+docker run -d \
+  --name nzbgetvpn \
+  --rm \
+  --cap-add=NET_ADMIN \
+  --cap-add=SYS_MODULE \
+  --sysctl="net.ipv4.conf.all.src_valid_mark=1" \
+  # --sysctl="net.ipv6.conf.all.disable_ipv6=0" \
+  --device=/dev/net/tun \
+  -p 6789:6789 \
+  # -p YOUR_HOST_PRIVOXY_PORT:8118 \ # Uncomment and set host port if ENABLE_PRIVOXY=yes in .env
+  -v "${HOST_DATA_DIR}/config:/config" \
+  -v "${HOST_DATA_DIR}/downloads:/downloads" \
+  --env-file "${HOST_DATA_DIR}/.env" \
+  # Ensure PUID, PGID, and TZ are set in your .env file
+  magicalyak/nzbgetvpn:latest
+```
+*For `YOUR_HOST_PRIVOXY_PORT`, choose an available port on your Docker host, e.g., `8118`.*
+
+**4. Running with Docker Compose 🐳**
+
+For a more declarative approach, a `docker-compose.yml` file is provided in the root of this repository. It's configured to use the `.env` file in the same directory for all environment-specific settings.
+
+**Steps:**
+
+1.  **Ensure `docker-compose.yml` is present:** If you cloned the repository, it's already there. Otherwise, you can copy its content from the repository into a file named `docker-compose.yml` in your chosen project directory.
+2.  **Customize Volume Paths (Crucial!):**
+    Open the `docker-compose.yml` file and **edit the `volumes` section**. The default paths are examples (`./data/config:/config` and `./data/downloads:/downloads`). You **must** change the host parts (left side of the colon) to the actual absolute paths on your Docker host where you want to store persistent configuration and downloads. For example:
+    ```yaml
+    volumes:
+      - /opt/nzbgetvpn_data/config:/config
+      - /opt/nzbgetvpn_data/downloads:/downloads
+    ```
+    These paths should correspond to the directories you prepared in Step 1 ("Prepare Your Docker Host System").
+3.  **Verify `.env` File:** Make sure your `.env` file (in the same directory as `docker-compose.yml`) is correctly configured with your `PUID`, `PGID`, `TZ`, VPN settings, etc., as described in Step 2 ("Create Your `.env` Configuration File"). The `docker-compose.yml` relies entirely on this `.env` file.
+4.  **Start the Container:**
+    Navigate to the directory containing your `docker-compose.yml` and `.env` file, then run:
+    ```bash
+docker-compose up -d
+    ```
+    Or, if you're using a newer Docker version with the Compose plugin integrated:
+    ```bash
+docker compose up -d
+    ```
+
+**To Stop and Remove:**
+```bash
+docker-compose down # or docker compose down
+```
+
+*(The provided `Makefile` also offers `make run` and `make run-wireguard` targets, which essentially use `docker run` commands similar to the examples above. It can be a convenient alternative for some users or for development purposes.)*
 
 ## 🖥️ Accessing Services
 
@@ -179,11 +296,22 @@ docker run -d \
 | `VPN_OPTIONS`            | Additional OpenVPN client command-line options.                            | `--inactive 3600 --ping-restart 60`      |                             |
 | `UMASK`                  | File creation mask for NZBGet.                                             | `022`                                    | (from base image)           |
 | `ADDITIONAL_PORTS`       | Comma-separated TCP/UDP ports for outbound allow via iptables.             | `9090,53/udp`                          |                             |
+| `NZBGET_S1_NAME`         | Name for NZBGet Server1.                                                   | `Newshosting`                            | `Newshosting`               |
+| `NZBGET_S1_HOST`         | Hostname for NZBGet Server1.                                               | `news.newshosting.com`                   |                             |
+| `NZBGET_S1_PORT`         | Port for NZBGet Server1.                                                   | `563`                                    | `563`                       |
+| `NZBGET_S1_USER`         | Username for NZBGet Server1.                                               | `your_user`                              |                             |
+| `NZBGET_S1_PASS`         | Password for NZBGet Server1.                                               | `your_pass`                              |                             |
+| `NZBGET_S1_CONN`         | Number of connections for NZBGet Server1.                                  | `15`                                     | `15`                        |
+| `NZBGET_S1_SSL`          | Enable SSL for NZBGet Server1 (`yes`/`no`).                                  | `yes`                                    | `yes`                       |
+| `NZBGET_S1_LEVEL`        | Priority level for NZBGet Server1.                                         | `0`                                      | `0`                         |
+| `NZBGET_S1_ENABLED`      | Enable NZBGet Server1 (`yes`/`no`).                                        | `yes`                                    | `yes`                       |
 
 **🔑 OpenVPN Credential Priority:**
 1.  If `VPN_USER` and `VPN_PASS` are both set, they will be used.
 2.  Else, if `/config/openvpn/credentials.txt` exists and is valid, it's used.
 3.  If neither, and your `.ovpn` needs auth, connection may fail.
+4.  **Provide credentials** via `VPN_USER`/`VPN_PASS` or `credentials.txt` if needed.
+This gives you full control over the exact configuration used.
 
 **💡 A Note on `VPN_PROV` (from other images):**
 This image prioritizes flexibility. It doesn't use `VPN_PROV` for auto-provider setup. Instead, you:
@@ -192,6 +320,24 @@ This image prioritizes flexibility. It doesn't use `VPN_PROV` for auto-provider 
 3.  **Set `VPN_CONFIG`** to its path inside the container (e.g., `/config/openvpn/your_file.ovpn`). Or let it auto-detect if it's the only one.
 4.  **Provide credentials** via `VPN_USER`/`VPN_PASS` or `credentials.txt` if needed.
 This gives you full control over the exact configuration used.
+
+### ⚙️ NZBGet News Server Configuration (via Environment Variables)
+
+You can pre-configure the first news server (Server1) in NZBGet using environment variables. This is useful for automating your setup or when you prefer not to manually edit `nzbget.conf` inside the container after deployment. An init script (`02-nzbget-news-server.sh`) runs on container startup and applies these settings to `/config/nzbget.conf`. If a setting for Server1 already exists in the file, it will be updated; otherwise, it will be added.
+
+See the environment variable table above (or `.env.sample`) for the `NZBGET_S1_*` variables. Here's a quick rundown:
+
+*   `NZBGET_S1_NAME`: A display name (e.g., "My News Provider").
+*   `NZBGET_S1_HOST`: Server address (e.g., `news.example.com`).
+*   `NZBGET_S1_PORT`: Port (e.g., `563` for SSL, `119` for non-SSL).
+*   `NZBGET_S1_USER`: Your Usenet username.
+*   `NZBGET_S1_PASS`: Your Usenet password.
+*   `NZBGET_S1_CONN`: Number of connections (e.g., `20`).
+*   `NZBGET_S1_SSL`: Set to `yes` to use SSL, `no` otherwise.
+*   `NZBGET_S1_LEVEL`: Server priority (e.g., `0` for primary, `1` for backup).
+*   `NZBGET_S1_ENABLED`: Set to `yes` to enable this server, `no` to disable it.
+
+If you don't set these, NZBGet will use its default Server1 configuration (if any) or you can configure it via the Web UI.
 
 ## 🤔 Troubleshooting Tips
 
@@ -227,3 +373,4 @@ Base image (`linuxserver/nzbget`) and bundled software (OpenVPN, WireGuard, Priv
 
 ## 🙏 Acknowledgements
 This project is inspired by the need for a secure, easy-to-use NZBGet setup with VPN support. Thanks to the `linuxserver/nzbget` team for their excellent base image and to the OpenVPN, WireGuard, and Privoxy communities for their contributions to open-source software.
+Special thanks also to the maintainers of the [jshridha/docker-nzbgetvpn](https://github.com/jshridha/docker-nzbgetvpn) repository, from which this project drew initial inspiration and some foundational concepts.
