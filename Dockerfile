@@ -77,8 +77,6 @@ RUN apk add --no-cache \
     python3 \
     jq \
     bc \
-    # Platform-specific packages
-    $(if [ "${TARGETARCH}" = "arm64" ]; then echo "arm64-specific-tools"; fi) \
     && for f in /etc/privoxy/*.new; do mv -n "$f" "${f%.new}"; done
 
 # Platform-specific optimizations

@@ -1,0 +1,53 @@
+# Privoxy configuration for nzbgetvpn
+# This is a template file that gets processed by the s6-overlay service script
+#
+# HTTP proxy configuration
+listen-address  0.0.0.0:__PRIVOXY_PORT__
+
+# Disable remote toggles for security
+toggle 0
+enable-remote-toggle 0
+enable-remote-http-toggle 0
+enable-edit-actions 0
+
+# Logging configuration
+logdir /var/log/privoxy
+logfile privoxy.log
+debug 1    # Show each request
+debug 1024 # Log the destination for requests Privoxy didn't let through
+
+# Trust all X-Forwarded-For headers for logging purposes  
+trust-info-url-prefix http://
+
+# Don't split large files when downloading
+split-large-forms 0
+
+# Keep connections alive when possible
+keep-alive-timeout 5
+default-server-timeout 60
+
+# Filter configuration - basic web filtering
+filterfile default.filter
+filterfile user.filter
+
+# Actions - define what to do with requests
+actionsfile match-all.action
+actionsfile default.action
+actionsfile user.action
+
+# Forward everything through the VPN (no upstream proxy)
+# All traffic will go through the VPN tunnel established by the container
+
+# Buffer configuration
+buffer-limit 4096
+
+# Connection settings optimized for VPN usage
+socket-timeout 300
+forwarded-connect-retries 2
+
+# Security settings
+enforce-blocks 0
+compression 1
+
+# Hide user agent for privacy
+hide-user-agent yes 
