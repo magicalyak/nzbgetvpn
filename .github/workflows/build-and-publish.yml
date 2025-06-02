@@ -9,6 +9,7 @@ name: Build and Publish Multi-Architecture Docker Images
 permissions:
   contents: read
   packages: write
+  security-events: write
 
 
 on:
@@ -264,6 +265,16 @@ jobs:
     if: github.event_name != 'pull_request'
     
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Ensure the entire history is fetched
+
+      - name: Set up Trivy cache directory
+        run: |
+          mkdir -p ${{ github.workspace }}/.cache/trivy
+          chmod -R 755 ${{ github.workspace }}/.cache/trivy
+
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -276,6 +287,7 @@ jobs:
           image-ref: ${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
           format: 'sarif'
           output: 'trivy-results.sarif'
+          cache-dir: ${{ github.workspace }}/.cache/trivy
 
       - name: Upload Trivy scan results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
@@ -290,6 +302,9 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Update Docker Hub README
         uses: peter-evans/dockerhub-description@v4
         with:
