@@ -40,39 +40,6 @@ body:
     validations:
       required: true
 
-  - type: dropdown
-    id: category
-    attributes:
-      label: Feature Category
-      description: Which area does this feature relate to?
-      options:
-        - VPN Configuration
-        - NZBGet Configuration
-        - Security & Privacy
-        - Monitoring & Health Checks
-        - User Interface / Web UI
-        - Docker & Container Management
-        - Networking
-        - Logging & Debugging
-        - Performance
-        - Documentation
-        - Other
-    validations:
-      required: true
-
-  - type: dropdown
-    id: priority
-    attributes:
-      label: Priority Level
-      description: How important is this feature to you?
-      options:
-        - Nice to have
-        - Would be helpful
-        - Important for my workflow
-        - Critical/blocking issue
-    validations:
-      required: true
-
   - type: textarea
     id: alternatives
     attributes:
@@ -90,21 +57,4 @@ body:
         - Examples from other projects
         - Screenshots or mockups
         - Technical specifications
-        - etc.
-
-  - type: textarea
-    id: implementation
-    attributes:
-      label: Implementation Ideas (Optional)
-      description: If you have ideas about how this could be implemented, share them here
-      placeholder: "Any thoughts on potential implementation approaches..."
-
-  - type: checkboxes
-    id: contribution
-    attributes:
-      label: Contribution
-      description: Would you be interested in contributing to this feature?
-      options:
-        - label: I would be interested in implementing this feature myself
-        - label: I would be willing to test this feature once implemented
-        - label: I can provide additional feedback and requirements 
+        - etc. 

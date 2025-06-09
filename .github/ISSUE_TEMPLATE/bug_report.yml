@@ -53,49 +53,15 @@ body:
     validations:
       required: true
 
-  - type: dropdown
-    id: vpn-type
-    attributes:
-      label: VPN Type
-      description: Which VPN protocol are you using?
-      options:
-        - OpenVPN
-        - WireGuard
-        - Both
-        - Not applicable
-    validations:
-      required: true
-
-  - type: input
-    id: vpn-provider
-    attributes:
-      label: VPN Provider
-      description: Which VPN provider are you using? (e.g., NordVPN, ExpressVPN, Surfshark, etc.)
-      placeholder: "Example: NordVPN"
-
-  - type: textarea
-    id: docker-compose
-    attributes:
-      label: Docker Compose Configuration
-      description: Your docker-compose.yml or docker run command (please redact sensitive information)
-      render: yaml
-      placeholder: |
-        version: '3.8'
-        services:
-          nzbgetvpn:
-            image: your/nzbgetvpn:latest
-            # ... rest of your config (redact passwords/keys)
-
   - type: textarea
     id: environment
     attributes:
-      label: Environment Variables
-      description: Relevant environment variables (please redact sensitive values)
+      label: Environment Configuration
+      description: Your docker-compose.yml, docker run command, or relevant environment variables (please redact sensitive values)
       render: bash
       placeholder: |
-        VPN_TYPE=openvpn
-        VPN_CONFIG_FILE=provider.ovpn
-        # ... other relevant env vars (redact sensitive values)
+        # Paste your docker-compose.yml, docker run command, or relevant environment variables here
+        # Please be sure to redact any sensitive information like passwords or keys
 
   - type: textarea
     id: logs
@@ -115,24 +81,6 @@ body:
       label: nzbgetvpn Version
       description: Which version/tag are you using?
       placeholder: "Example: v25.0.20 or latest"
-    validations:
-      required: true
-
-  - type: dropdown
-    id: platform
-    attributes:
-      label: Platform
-      description: What platform are you running on?
-      options:
-        - Linux (x86_64)
-        - Linux (ARM64)
-        - macOS (Intel)
-        - macOS (Apple Silicon)
-        - Windows (with WSL2)
-        - Windows (Docker Desktop)
-        - Synology NAS
-        - QNAP NAS
-        - Other (specify in additional context)
     validations:
       required: true
 
