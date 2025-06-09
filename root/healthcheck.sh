@@ -135,10 +135,10 @@ determine_vpn_interface() {
         log "INFO" "VPN interface from file: $vpn_if"
     else
         # Fallback detection
-        if ip link show wg0 &> /dev/null; then
+  if ip link show wg0 &> /dev/null; then
             vpn_if="wg0"
             log "INFO" "VPN interface detected (fallback): $vpn_if (WireGuard)"
-        elif ip link show tun0 &> /dev/null; then
+  elif ip link show tun0 &> /dev/null; then
             vpn_if="tun0"
             log "INFO" "VPN interface detected (fallback): $vpn_if (OpenVPN)"
         else
@@ -184,8 +184,8 @@ check_ip_leak() {
     if [[ "${DISABLE_IP_LEAK_CHECK:-false}" == "true" ]]; then
         log "INFO" "IP leak check disabled"
         return 0
-    fi
-    
+fi
+
     # Get our expected VPN IP range from environment or config
     local expected_vpn_network="${VPN_NETWORK:-}"
     
