@@ -55,6 +55,34 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Validate Docker Hub credentials
+        id: validate-creds
+        if: github.event_name != 'pull_request'
+        run: |
+          if [[ -z "${{ secrets.DOCKERHUB_USERNAME }}" ]]; then
+            echo "❌ DOCKERHUB_USERNAME secret is not set"
+            echo "has-creds=false" >> $GITHUB_OUTPUT
+            exit 1
+          elif [[ -z "${{ secrets.DOCKERHUB_TOKEN }}" ]]; then
+            echo "❌ DOCKERHUB_TOKEN secret is not set"
+            echo "has-creds=false" >> $GITHUB_OUTPUT
+            exit 1
+          else
+            echo "✅ Docker Hub credentials are configured"
+            echo "has-creds=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Debug registry information
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "Using Docker Hub registry: ${{ env.REGISTRY_DOCKERHUB }}"
+          echo "Using image name: ${{ env.IMAGE_NAME }}"
+          echo "Username length: ${#DOCKERHUB_USERNAME}"
+          echo "Token length: ${#DOCKERHUB_TOKEN}"
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -112,7 +140,7 @@ jobs:
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
-          outputs: type=image,name=${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=${{ github.event_name != 'pull_request' }}
           cache-from: type=gha,scope=${{ env.PLATFORM_PAIR }}
           cache-to: type=gha,mode=max,scope=${{ env.PLATFORM_PAIR }}
           build-args: |
@@ -182,14 +210,14 @@ jobs:
       - name: Create manifest list and push to Docker Hub
         working-directory: /tmp/digests
         run: |
-          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+          docker buildx imagetools create $(jq -cr '.tags | map(select(contains("docker.io")) | "-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             $(printf '${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
 
       - name: Create manifest list and push to GHCR
         working-directory: /tmp/digests
         run: |
           # Create tags for GHCR
-          GHCR_TAGS=$(echo '${{ steps.meta.outputs.tags }}' | grep ghcr.io | sed 's|.*ghcr.io/|-t ghcr.io/|g' | tr '\n' ' ')
+          GHCR_TAGS=$(jq -cr '.tags | map(select(contains("ghcr.io")) | "-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON")
           docker buildx imagetools create $GHCR_TAGS \
             $(printf '${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
 

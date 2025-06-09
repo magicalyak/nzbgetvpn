@@ -8,7 +8,7 @@ if [[ "${ENABLE_PRIVOXY,,}" != "yes" && "${ENABLE_PRIVOXY,,}" != "true" ]]; then
   # Use a flag file to track if the message has already been shown.
   FLAG_FILE="/tmp/privoxy-disabled-message-shown"
   if [[ ! -f "$FLAG_FILE" ]]; then
-    echo "[INFO] Privoxy is disabled (ENABLE_PRIVOXY is not 'yes' or 'true'). Exiting privoxy service script."
+  echo "[INFO] Privoxy is disabled (ENABLE_PRIVOXY is not 'yes' or 'true'). Exiting privoxy service script."
     touch "$FLAG_FILE"
   fi
   exit 111 # Exit with 111 to tell s6-rc this service is permanently down

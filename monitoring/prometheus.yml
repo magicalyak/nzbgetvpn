@@ -1,0 +1,8 @@
+# prometheus.yml
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'nzbgetvpn'
+    static_configs:
+      - targets: ['nzbgetvpn:8080'] 

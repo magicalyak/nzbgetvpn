@@ -194,6 +194,39 @@ nzbgetvpn_response_time_seconds{check="nzbget",stat="maximum"} 0.120
 nzbgetvpn_success_rate_percent{check="nzbget"} 99.8
 ```
 
+## 📈 Monitoring with Prometheus & Grafana
+
+This repository includes a pre-configured monitoring stack using [Prometheus](https://prometheus.io/) and [Grafana](https://grafana.com/) to visualize the metrics exposed by the `/prometheus` endpoint.
+
+### Quick Start
+
+1.  **Navigate to the `monitoring` directory:**
+    ```bash
+    cd monitoring
+    ```
+
+2.  **Customize `docker-compose.yml` (Optional):**
+    Open `docker-compose.yml` and add your `nzbgetvpn` environment variables (e.g., for VPN configuration).
+
+3.  **Launch the stack:**
+    ```bash
+    docker-compose up -d
+    ```
+
+4.  **Access Grafana:**
+    Open your web browser and go to `http://localhost:3000`.
+    - **Username:** `admin`
+    - **Password:** `grafana`
+
+The Prometheus data source and the nzbgetvpn dashboard will be automatically provisioned.
+
+### Included Components
+
+- **`docker-compose.yml`:** Orchestrates the `nzbgetvpn`, `prometheus`, and `grafana` services.
+- **`prometheus.yml`:** Configures Prometheus to scrape metrics from `nzbgetvpn`.
+- **`grafana-datasource.yml`:** Provisions the Prometheus datasource in Grafana.
+- **`grafana-dashboard.json`:** The pre-built Grafana dashboard for visualizing metrics.
+
 ## 🔄 Auto-Restart System
 
 ### ⚙️ Configuration
