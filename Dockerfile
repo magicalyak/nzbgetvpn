@@ -1,3 +1,6 @@
+# Add a stage for the nzbget-exporter
+FROM frebib/nzbget-exporter:latest AS exporter
+
 FROM ghcr.io/linuxserver/nzbget:latest
 
 # ENV NZBGET_VERSION=25.0
@@ -22,6 +25,7 @@ ENV VPN_OPTIONS=${VPN_OPTIONS:-}
 ENV LAN_NETWORK=${LAN_NETWORK:-}
 ENV ADDITIONAL_PORTS=${ADDITIONAL_PORTS:-}
 ENV PRIVOXY_PORT=${PRIVOXY_PORT:-8118}
+ENV ENABLE_EXPORTER=${ENABLE_EXPORTER:-no}
 
 # NZBGet Server1 Configuration ENV (populated by 02-nzbget-news-server.sh)
 ENV NZBGET_S1_NAME=${NZBGET_S1_NAME:-}
@@ -38,6 +42,9 @@ ENV NZBGET_S1_ENABLED=${NZBGET_S1_ENABLED:-yes}
 RUN apk add --no-cache openvpn iptables bash curl iproute2 wireguard-tools privoxy && \
     for f in /etc/privoxy/*.new; do mv -n "$f" "${f%.new}"; done
 
+# Copy exporter binary
+COPY --from=exporter /nzbget-exporter /usr/local/bin/nzbget-exporter
+
 # Copy s6-overlay init scripts
 COPY root/etc/cont-init.d/01-ensure-vpn-config-dirs.sh /etc/cont-init.d/01-ensure-vpn-config-dirs
 COPY root/etc/cont-init.d/99-nzbget-news-server-override.sh /etc/cont-init.d/99-nzbget-news-server-override
@@ -49,12 +56,17 @@ COPY root/healthcheck.sh /root/healthcheck.sh
 # Copy Privoxy configuration template and s6 service files
 COPY config/privoxy/config /etc/privoxy/config.template
 COPY root_s6/privoxy/run /etc/s6-overlay/s6-rc.d/privoxy/run
+COPY root_s6/nzbget-exporter/ /etc/s6-overlay/s6-rc.d/nzbget-exporter/
 RUN mkdir -p /etc/s6-overlay/s6-rc.d/user/contents.d && \
     echo "longrun" > /etc/s6-overlay/s6-rc.d/privoxy/type && \
-    touch /etc/s6-overlay/s6-rc.d/user/contents.d/privoxy
+    touch /etc/s6-overlay/s6-rc.d/user/contents.d/privoxy && \
+    touch /etc/s6-overlay/s6-rc.d/user/contents.d/nzbget-exporter
 
 # Make scripts executable
-RUN chmod +x /etc/cont-init.d/* /root/healthcheck.sh /etc/s6-overlay/s6-rc.d/privoxy/run
+RUN chmod +x /etc/cont-init.d/* /root/healthcheck.sh /etc/s6-overlay/s6-rc.d/privoxy/run /usr/local/bin/nzbget-exporter /etc/s6-overlay/s6-rc.d/nzbget-exporter/run
+
+# Expose NZBGet webui, privoxy and exporter ports
+EXPOSE 6789 8118 9452
 
 # Healthcheck
 HEALTHCHECK --interval=1m --timeout=10s --start-period=2m --retries=3 \

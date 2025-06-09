@@ -1,0 +1,21 @@
+#!/usr/bin/with-contenv bash
+
+# This script runs the nzbget-exporter to expose Prometheus metrics.
+
+if [ "${ENABLE_EXPORTER}" != "yes" ]; then
+  echo "NZBGet Exporter is disabled. Set ENABLE_EXPORTER=yes to enable it."
+  # s6 will not restart this script because it exits with 0
+  exit 0
+fi
+
+# The exporter will connect to the NZBGet instance running in the same container.
+# NZBGET_USERNAME and NZBGET_PASSWORD should be set in the environment.
+
+echo "Starting NZBGet Exporter..."
+
+# Execute the exporter binary
+exec /usr/local/bin/nzbget-exporter \
+  --host="http://localhost:6789" \
+  --username="${NZBGET_USERNAME}" \
+  --password="${NZBGET_PASSWORD}" \
+  --listen=":9452" 

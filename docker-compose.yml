@@ -8,8 +8,8 @@ services:
       - .env # Load environment variables from .env file in the same directory
     ports:
       - "6789:6789" # NZBGet Web UI
-      # - "8118:8118" # Privoxy - Uncomment if ENABLE_PRIVOXY=yes in .env and you chose port 8118 for host
-                      # Ensure the host port (left side) matches your desired host port and PRIVOXY_PORT in .env if changed
+      # - "8118:8118" # Privoxy. Uncomment if you set ENABLE_PRIVOXY=yes in .env
+      # - "9452:9452" # Prometheus Exporter. Uncomment if you set ENABLE_EXPORTER=yes in .env
     volumes:
       # IMPORTANT: Replace ./data/config and ./data/downloads with the actual paths on your host
       # where you want to store persistent configuration and downloads.
