@@ -267,9 +267,9 @@ jobs:
 
       - name: Debug metadata output
         run: |
-          echo "Tags: ${{ steps.meta.outputs.tags }}"
+          echo "Available tags:"
+          echo '${{ steps.meta.outputs.tags }}' | tr ',' '\n'
           echo "Version: ${{ steps.meta.outputs.version }}"
-          echo "Full JSON: ${{ steps.meta.outputs.json }}"
 
       - name: Test multi-arch image
         run: |
@@ -279,27 +279,14 @@ jobs:
           # Test basic functionality
           docker run --rm --platform ${{ matrix.platform }} \
             ${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }} \
-            sh -c "
-              echo 'Testing basic functionality on ${{ matrix.platform }}' &&
-              python3 --version &&
-              openvpn --version | head -1 &&
-              wg --version &&
-              curl --version | head -1 &&
-              jq --version &&
-              bc --version | head -1 &&
-              echo 'All basic tools available'
-            "
+            sh -c 'echo "Testing basic functionality on ${{ matrix.platform }}" && python3 --version && openvpn --version | head -1 && wg --version && curl --version | head -1 && jq --version && bc --version | head -1 && echo "All basic tools available"'
 
       - name: Test platform-specific optimizations
         run: |
           # Test architecture detection
           docker run --rm --platform ${{ matrix.platform }} \
             ${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }} \
-            sh -c "
-              echo 'Architecture: $(uname -m)' &&
-              echo 'Platform: $(uname -s)' &&
-              cat /proc/cpuinfo | grep -E '(processor|model name|Hardware|Revision)' | head -5 || echo 'CPU info not available'
-            "
+            sh -c 'echo "Architecture: $(uname -m)" && echo "Platform: $(uname -s)" && (cat /proc/cpuinfo | grep -E "(processor|model name|Hardware|Revision)" | head -5 || echo "CPU info not available")'
 
   security-scan:
     runs-on: ubuntu-latest
