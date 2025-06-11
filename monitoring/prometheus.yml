@@ -1,8 +1,32 @@
 # prometheus.yml
 global:
-  scrape_interval: 15s
- 
+  scrape_interval: 30s
+  evaluation_interval: 30s
+
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
 scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # nzbgetvpn monitoring
   - job_name: 'nzbgetvpn'
     static_configs:
-      - targets: ['nzbgetvpn:8080'] 
+      - targets: ['nzbgetvpn:8080']
+    metrics_path: '/prometheus'
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    params:
+      format: ['prometheus']
+
+  # nzbgetvpn health check (JSON endpoint converted to metrics)
+  - job_name: 'nzbgetvpn-health'
+    static_configs:
+      - targets: ['nzbgetvpn:8080']
+    metrics_path: '/health'
+    scrape_interval: 15s
+    scrape_timeout: 5s 
