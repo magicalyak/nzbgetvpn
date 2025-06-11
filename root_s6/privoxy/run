@@ -36,37 +36,58 @@ if [ ! -s "$ACTUAL_CONFIG" ]; then # Check if sed failed or template was bad
     exit 1
 fi
 
-# Copy filter and action files from user config to where Privoxy expects them
+# Setup filter and action files
 echo "[INFO] Setting up Privoxy filter and action files..."
 USER_PRIVOXY_DIR="/config/privoxy"
 PRIVOXY_ETC_DIR="/etc/privoxy"
 
-# Copy filter files if they exist
-if [ -f "$USER_PRIVOXY_DIR/default.filter" ]; then
-    cp "$USER_PRIVOXY_DIR/default.filter" "$PRIVOXY_ETC_DIR/"
-    echo "[INFO] Copied default.filter"
+# Allow users to disable automatic file management if they have custom setups
+if [[ "${PRIVOXY_SKIP_FILE_SETUP,,}" == "yes" || "${PRIVOXY_SKIP_FILE_SETUP,,}" == "true" ]]; then
+    echo "[INFO] PRIVOXY_SKIP_FILE_SETUP is enabled - skipping automatic filter/action file management"
+    echo "[INFO] Ensure you have proper filter and action files in place manually"
+else
+
+# Function to safely copy a file with fallback
+copy_privoxy_file() {
+    local filename="$1"
+    local user_file="$USER_PRIVOXY_DIR/$filename"
+    local etc_file="$PRIVOXY_ETC_DIR/$filename"
+    
+    if [ -f "$user_file" ]; then
+        echo "[INFO] Using user's custom $filename"
+        cp "$user_file" "$etc_file"
+    elif [ ! -f "$etc_file" ]; then
+        echo "[INFO] No $filename found, this may cause Privoxy startup issues"
+        echo "[INFO] Consider creating $user_file for custom configuration"
+    else
+        echo "[INFO] Using built-in default $filename"
+    fi
+}
+
+# Copy or use default files
+copy_privoxy_file "default.filter"
+copy_privoxy_file "user.filter"
+copy_privoxy_file "default.action"
+copy_privoxy_file "match-all.action"
+copy_privoxy_file "user.action"
+
+# Verify essential files exist
+REQUIRED_FILES=("default.filter" "default.action")
+MISSING_FILES=()
+
+for file in "${REQUIRED_FILES[@]}"; do
+    if [ ! -f "$PRIVOXY_ETC_DIR/$file" ]; then
+        MISSING_FILES+=("$file")
+    fi
+done
+
+if [ ${#MISSING_FILES[@]} -gt 0 ]; then
+    echo "[WARNING] Missing required Privoxy files: ${MISSING_FILES[*]}"
+    echo "[WARNING] Privoxy may fail to start. Consider adding these files to $USER_PRIVOXY_DIR"
+    echo "[INFO] You can copy sample files from the container's /etc/privoxy/ directory"
 fi
 
-if [ -f "$USER_PRIVOXY_DIR/user.filter" ]; then
-    cp "$USER_PRIVOXY_DIR/user.filter" "$PRIVOXY_ETC_DIR/"
-    echo "[INFO] Copied user.filter"
-fi
-
-# Copy action files if they exist
-if [ -f "$USER_PRIVOXY_DIR/default.action" ]; then
-    cp "$USER_PRIVOXY_DIR/default.action" "$PRIVOXY_ETC_DIR/"
-    echo "[INFO] Copied default.action"
-fi
-
-if [ -f "$USER_PRIVOXY_DIR/match-all.action" ]; then
-    cp "$USER_PRIVOXY_DIR/match-all.action" "$PRIVOXY_ETC_DIR/"
-    echo "[INFO] Copied match-all.action"
-fi
-
-if [ -f "$USER_PRIVOXY_DIR/user.action" ]; then
-    cp "$USER_PRIVOXY_DIR/user.action" "$PRIVOXY_ETC_DIR/"
-    echo "[INFO] Copied user.action"
-fi
+fi  # End of PRIVOXY_SKIP_FILE_SETUP check
 
 # Ensure log directory exists
 mkdir -p /var/log/privoxy
