@@ -5,13 +5,13 @@ services:
   nzbgetvpn:
     image: magicalyak/nzbgetvpn:latest
     container_name: nzbgetvpn
-    env_file: .env
+    env_file: ../../.env
     ports:
       - "6789:6789"          # NZBGet Web UI
       - "8080:8080"          # Monitoring
     volumes:
-      - ./config:/config
-      - ./downloads:/downloads
+      - ../../config:/config
+      - ../../downloads:/downloads
     cap_add:
       - NET_ADMIN
       - SYS_MODULE
@@ -48,7 +48,7 @@ services:
     image: telegraf:1.28
     container_name: telegraf
     volumes:
-      - ./monitoring/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+      - ../telegraf.conf:/etc/telegraf/telegraf.conf:ro
     environment:
       - INFLUX_TOKEN=nzbgetvpn-monitoring-token
       - INFLUX_ORG=nzbgetvpn
@@ -68,8 +68,8 @@ services:
       - "3000:3000"
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./monitoring/grafana-influx/dashboards:/etc/grafana/provisioning/dashboards:ro
-      - ./monitoring/grafana-influx/datasources:/etc/grafana/provisioning/datasources:ro
+      - ../grafana-influx/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ../grafana-influx/datasources:/etc/grafana/provisioning/datasources:ro
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin123
       - GF_USERS_ALLOW_SIGN_UP=false

@@ -29,8 +29,10 @@ Your nzbgetvpn container exposes the following monitoring endpoints on port 8080
 
 ### Setup Steps
 
-1. **Use the Prometheus docker-compose file**:
+1. **Navigate to the monitoring directory and use the Prometheus docker-compose file**:
    ```bash
+   cd monitoring/docker-compose
+   
    # Start the monitoring stack
    docker-compose -f docker-compose.monitoring-prometheus.yml up -d
    ```
@@ -77,8 +79,10 @@ nzbgetvpn_success_rate_percent{check="type"}
 
 ### Setup Steps
 
-1. **Use the InfluxDB docker-compose file**:
+1. **Navigate to the monitoring directory and use the InfluxDB docker-compose file**:
    ```bash
+   cd monitoring/docker-compose
+   
    # Start the monitoring stack
    docker-compose -f docker-compose.monitoring-influxdb.yml up -d
    ```
@@ -110,6 +114,32 @@ Data is stored in these InfluxDB measurements:
 - `nzbgetvpn_health_status` - Overall health status and messages
 - `nzbgetvpn_system` - System metrics (memory, load, uptime)
 - Prometheus metrics (if using the prometheus input)
+
+## Directory Structure
+
+The monitoring setup is organized as follows:
+
+```
+monitoring/
+├── docker-compose/                          # Docker Compose files
+│   ├── docker-compose.monitoring-prometheus.yml
+│   └── docker-compose.monitoring-influxdb.yml
+├── docs/                                    # Documentation
+│   └── MONITORING_SETUP.md
+├── grafana/                                 # Prometheus Grafana configs
+│   ├── dashboards/
+│   │   ├── dashboard.yml
+│   │   └── nzbgetvpn-dashboard.json
+│   └── datasources/
+│       └── prometheus.yml
+├── grafana-influx/                          # InfluxDB Grafana configs
+│   ├── dashboards/
+│   │   └── dashboard.yml
+│   └── datasources/
+│       └── influxdb.yml
+├── prometheus.yml                           # Prometheus configuration
+└── telegraf.conf                           # Telegraf configuration
+```
 
 ## Customization
 
@@ -238,6 +268,11 @@ from(bucket: "metrics")
    - Check the data source connection in Grafana settings
    - Verify the time range matches when metrics started collecting
    - Use Grafana's query builder to test queries
+
+5. **Docker-compose path issues**:
+   - Ensure you're running docker-compose from the `monitoring/docker-compose/` directory
+   - Check that your `.env` file is in the project root (two levels up from docker-compose files)
+   - Verify config and downloads directories exist in the project root
 
 ### Log Files
 
