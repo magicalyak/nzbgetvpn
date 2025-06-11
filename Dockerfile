@@ -113,6 +113,8 @@ COPY root/platform-info.sh /root/platform-info.sh
 
 # Copy Privoxy configuration template and s6 service files
 COPY config/privoxy/config /etc/privoxy/config.template
+COPY config/privoxy/*.filter /etc/privoxy/
+COPY config/privoxy/*.action /etc/privoxy/
 COPY root_s6/privoxy/run /etc/s6-overlay/s6-rc.d/privoxy/run
 COPY root_s6/monitoring/run /etc/s6-overlay/s6-rc.d/monitoring/run
 COPY root_s6/auto-restart/run /etc/s6-overlay/s6-rc.d/auto-restart/run

@@ -36,6 +36,38 @@ if [ ! -s "$ACTUAL_CONFIG" ]; then # Check if sed failed or template was bad
     exit 1
 fi
 
+# Copy filter and action files from user config to where Privoxy expects them
+echo "[INFO] Setting up Privoxy filter and action files..."
+USER_PRIVOXY_DIR="/config/privoxy"
+PRIVOXY_ETC_DIR="/etc/privoxy"
+
+# Copy filter files if they exist
+if [ -f "$USER_PRIVOXY_DIR/default.filter" ]; then
+    cp "$USER_PRIVOXY_DIR/default.filter" "$PRIVOXY_ETC_DIR/"
+    echo "[INFO] Copied default.filter"
+fi
+
+if [ -f "$USER_PRIVOXY_DIR/user.filter" ]; then
+    cp "$USER_PRIVOXY_DIR/user.filter" "$PRIVOXY_ETC_DIR/"
+    echo "[INFO] Copied user.filter"
+fi
+
+# Copy action files if they exist
+if [ -f "$USER_PRIVOXY_DIR/default.action" ]; then
+    cp "$USER_PRIVOXY_DIR/default.action" "$PRIVOXY_ETC_DIR/"
+    echo "[INFO] Copied default.action"
+fi
+
+if [ -f "$USER_PRIVOXY_DIR/match-all.action" ]; then
+    cp "$USER_PRIVOXY_DIR/match-all.action" "$PRIVOXY_ETC_DIR/"
+    echo "[INFO] Copied match-all.action"
+fi
+
+if [ -f "$USER_PRIVOXY_DIR/user.action" ]; then
+    cp "$USER_PRIVOXY_DIR/user.action" "$PRIVOXY_ETC_DIR/"
+    echo "[INFO] Copied user.action"
+fi
+
 # Ensure log directory exists
 mkdir -p /var/log/privoxy
 chown privoxy:privoxy /var/log/privoxy # Use privoxy user if it exists
