@@ -2,7 +2,7 @@
 # Simple configuration that won't break most websites
 
 # Default settings - minimal filtering, basic privacy
-{-block +hide-user-agent{Mozilla/5.0 (nzbgetvpn proxy)} +hide-referrer{conditional-block}}
+{+hide-user-agent{nzbgetvpn/1.0} +hide-referrer{conditional-block}}
 # Apply to all requests
 /
 

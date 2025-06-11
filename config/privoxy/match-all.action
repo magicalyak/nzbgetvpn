@@ -1,15 +1,7 @@
 # match-all.action - Basic actions for all requests
-# This file contains actions that apply to all requests
+# Simple configuration for basic privacy
 
-# Basic security and privacy settings for all requests
-{+handle-as-empty-document}
-# Block these common tracking/ad domains (basic list)
-.doubleclick.net
-.googleadservices.com
-.googlesyndication.com
-.amazon-adsystem.com
-
-# Allow everything else with basic privacy protection
+# Basic privacy settings for all requests
 {+hide-user-agent{nzbgetvpn} +hide-referrer{conditional-block}}
-# Apply to all other requests
+# Apply to all requests
 / 

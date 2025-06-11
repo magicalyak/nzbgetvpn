@@ -1,14 +1,15 @@
 # Default filter file for Privoxy
-# This file contains basic filters for web content
+# Simple, reliable filters that won't break parsing
 
 FILTER: no-popups No Pop-ups
-# Block popup windows
-s@<\s*script[^>]*>.*?(?:(?:window\.open|\.open)\s*\(|\.go\s*\().*?</script>@@sigU
+# Block basic popup patterns
+s@window\.open\s*\(@@g
 
-FILTER: no-ads Simple ad blocking
-# Basic ad blocking filter
-s@<\s*(?:iframe|frame)[^>]*?(?:ads?|banner|popup)[^>]*>.*?</(?:iframe|frame)>@@sigU
+FILTER: basic-ads Basic ad blocking  
+# Simple ad patterns
+s@<script[^>]*doubleclick[^>]*>.*?</script>@@sigU
 
-FILTER: clean-headers Clean HTTP headers
-# Remove some tracking headers
-s@(User-Agent:|Referer:).*@$1 nzbgetvpn@gmi 
+FILTER: clean-referer Clean referrer
+# Basic privacy - remove referrers to ad domains
+s@Referer: .*doubleclick.*@Referer: @gm
+s@Referer: .*google.*ads.*@Referer: @gm 

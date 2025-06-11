@@ -5,7 +5,7 @@
 # {+block}
 # .unwanted-site.com
 #
-# {-block +hide-user-agent{My Custom Agent}}
+# {+hide-user-agent{My Custom Agent}}
 # .trusted-site.com
 #
 # This file is empty by default - add your own actions as needed 

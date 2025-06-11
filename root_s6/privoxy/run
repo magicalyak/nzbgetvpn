@@ -47,54 +47,129 @@ if [[ "${PRIVOXY_SKIP_FILE_SETUP,,}" == "yes" || "${PRIVOXY_SKIP_FILE_SETUP,,}" 
     echo "[INFO] Ensure you have proper filter and action files in place manually"
 else
 
-# Function to safely copy a file with fallback
-copy_privoxy_file() {
+# Function to safely ensure a file exists with fallback
+ensure_privoxy_file() {
     local filename="$1"
     local user_file="$USER_PRIVOXY_DIR/$filename"
     local etc_file="$PRIVOXY_ETC_DIR/$filename"
     
+    # Debug: Check what files exist
+    echo "[DEBUG] Checking for $filename:"
+    echo "[DEBUG]   User file $user_file: $([ -f "$user_file" ] && echo "exists" || echo "missing")"
+    echo "[DEBUG]   System file $etc_file: $([ -f "$etc_file" ] && echo "exists" || echo "missing")"
+    
     if [ -f "$user_file" ]; then
         echo "[INFO] Using user's custom $filename"
         cp "$user_file" "$etc_file"
-    elif [ ! -f "$etc_file" ]; then
-        echo "[INFO] No $filename found, this may cause Privoxy startup issues"
-        echo "[INFO] Consider creating $user_file for custom configuration"
-    else
+        chmod 644 "$etc_file"
+    elif [ -f "$etc_file" ]; then
         echo "[INFO] Using built-in default $filename"
+        # Ensure proper permissions
+        chmod 644 "$etc_file"
+    else
+        echo "[ERROR] No $filename found in either location!"
+        echo "[ERROR] Checked: $user_file and $etc_file"
+        
+        # Create a minimal default file to prevent Privoxy from crashing
+        case "$filename" in
+            "default.filter")
+                echo "[INFO] Creating minimal default.filter"
+                cat > "$etc_file" << 'EOF'
+# Minimal default filter file for Privoxy
+# This is a fallback created by the startup script
+
+FILTER: no-popups No Pop-ups
+# Block popup windows
+s@window\.open\s*\([^)]*\)@@g
+
+FILTER: basic-ads Basic ad blocking
+# Simple ad blocking
+s@<script[^>]*>.*?google.*?ads.*?</script>@@sigU
+EOF
+                ;;
+            "user.filter")
+                echo "[INFO] Creating empty user.filter"
+                cat > "$etc_file" << 'EOF'
+# User-defined filter file for Privoxy
+# Add your custom filters here
+EOF
+                ;;
+            "default.action")
+                echo "[INFO] Creating minimal default.action"
+                cat > "$etc_file" << 'EOF'
+# Minimal default actions for Privoxy
+# Basic privacy protection without breaking sites
+
+{+hide-user-agent{nzbgetvpn/1.0} +hide-referrer{conditional-block}}
+/
+EOF
+                ;;
+            "match-all.action")
+                echo "[INFO] Creating minimal match-all.action"
+                cat > "$etc_file" << 'EOF'
+# Basic actions for all requests
+{+hide-user-agent{nzbgetvpn}}
+/
+EOF
+                ;;
+            "user.action")
+                echo "[INFO] Creating empty user.action"
+                cat > "$etc_file" << 'EOF'
+# User-defined actions for Privoxy
+# Add your custom actions here
+EOF
+                ;;
+        esac
+        chmod 644 "$etc_file"
+    fi
+    
+    # Verify the file was created/exists and is readable
+    if [ -f "$etc_file" ] && [ -r "$etc_file" ]; then
+        echo "[INFO] ✓ $filename is ready ($(wc -l < "$etc_file") lines)"
+    else
+        echo "[ERROR] ✗ Failed to ensure $filename exists and is readable"
+        return 1
     fi
 }
 
-# Copy or use default files
-copy_privoxy_file "default.filter"
-copy_privoxy_file "user.filter"
-copy_privoxy_file "default.action"
-copy_privoxy_file "match-all.action"
-copy_privoxy_file "user.action"
+# Ensure all required files exist
+ensure_privoxy_file "default.filter"
+ensure_privoxy_file "user.filter"
+ensure_privoxy_file "default.action"
+ensure_privoxy_file "match-all.action"
+ensure_privoxy_file "user.action"
 
-# Verify essential files exist
+# Final verification of essential files
 REQUIRED_FILES=("default.filter" "default.action")
 MISSING_FILES=()
 
 for file in "${REQUIRED_FILES[@]}"; do
-    if [ ! -f "$PRIVOXY_ETC_DIR/$file" ]; then
+    if [ ! -f "$PRIVOXY_ETC_DIR/$file" ] || [ ! -r "$PRIVOXY_ETC_DIR/$file" ]; then
         MISSING_FILES+=("$file")
     fi
 done
 
 if [ ${#MISSING_FILES[@]} -gt 0 ]; then
-    echo "[WARNING] Missing required Privoxy files: ${MISSING_FILES[*]}"
-    echo "[WARNING] Privoxy may fail to start. Consider adding these files to $USER_PRIVOXY_DIR"
-    echo "[INFO] You can copy sample files from the container's /etc/privoxy/ directory"
+    echo "[ERROR] Critical Privoxy files are missing or unreadable: ${MISSING_FILES[*]}"
+    echo "[ERROR] Cannot start Privoxy safely"
+    exit 1
 fi
+
+echo "[INFO] All Privoxy configuration files verified ✓"
 
 fi  # End of PRIVOXY_SKIP_FILE_SETUP check
 
 # Ensure log directory exists
 mkdir -p /var/log/privoxy
-chown privoxy:privoxy /var/log/privoxy # Use privoxy user if it exists
+chown privoxy:privoxy /var/log/privoxy 2>/dev/null || chown nobody:nogroup /var/log/privoxy 2>/dev/null || true
+
+# Debug: List all files in /etc/privoxy before starting
+echo "[DEBUG] Contents of /etc/privoxy/:"
+ls -la /etc/privoxy/ || true
 
 # Run Privoxy in the foreground, without chroot, with our config file
 # The s6 supervisor will handle daemonizing and restarting.
 # The --no-daemon flag is crucial for s6.
+echo "[INFO] Starting Privoxy with config: /etc/privoxy/config"
 exec /usr/sbin/privoxy --no-daemon /etc/privoxy/config 
 # exec /usr/sbin/privoxy --no-daemon /etc/privoxy/config >/dev/stdout 2>&1 
