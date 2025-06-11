@@ -24,13 +24,13 @@ keep-alive-timeout 5
 default-server-timeout 60
 
 # Filter configuration - basic web filtering
-filterfile default.filter
-filterfile user.filter
+filterfile /etc/privoxy/default.filter
+filterfile /etc/privoxy/user.filter
 
 # Actions - define what to do with requests
-actionsfile match-all.action
-actionsfile default.action
-actionsfile user.action
+actionsfile /etc/privoxy/match-all.action
+actionsfile /etc/privoxy/default.action
+actionsfile /etc/privoxy/user.action
 
 # Forward everything through the VPN (no upstream proxy)
 # All traffic will go through the VPN tunnel established by the container

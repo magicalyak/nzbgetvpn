@@ -53,10 +53,12 @@ ensure_privoxy_file() {
     local user_file="$USER_PRIVOXY_DIR/$filename"
     local etc_file="$PRIVOXY_ETC_DIR/$filename"
     
-    # Debug: Check what files exist
-    echo "[DEBUG] Checking for $filename:"
-    echo "[DEBUG]   User file $user_file: $([ -f "$user_file" ] && echo "exists" || echo "missing")"
-    echo "[DEBUG]   System file $etc_file: $([ -f "$etc_file" ] && echo "exists" || echo "missing")"
+    # Debug: Check what files exist (only if DEBUG is enabled)
+    if [[ "${DEBUG,,}" == "true" ]]; then
+        echo "[DEBUG] Checking for $filename:"
+        echo "[DEBUG]   User file $user_file: $([ -f "$user_file" ] && echo "exists" || echo "missing")"
+        echo "[DEBUG]   System file $etc_file: $([ -f "$etc_file" ] && echo "exists" || echo "missing")"
+    fi
     
     if [ -f "$user_file" ]; then
         echo "[INFO] Using user's custom $filename"
@@ -163,9 +165,11 @@ fi  # End of PRIVOXY_SKIP_FILE_SETUP check
 mkdir -p /var/log/privoxy
 chown privoxy:privoxy /var/log/privoxy 2>/dev/null || chown nobody:nogroup /var/log/privoxy 2>/dev/null || true
 
-# Debug: List all files in /etc/privoxy before starting
-echo "[DEBUG] Contents of /etc/privoxy/:"
-ls -la /etc/privoxy/ || true
+# Debug: List all files in /etc/privoxy before starting (only if DEBUG is enabled)
+if [[ "${DEBUG,,}" == "true" ]]; then
+    echo "[DEBUG] Contents of /etc/privoxy/:"
+    ls -la /etc/privoxy/ || true
+fi
 
 # Run Privoxy in the foreground, without chroot, with our config file
 # The s6 supervisor will handle daemonizing and restarting.
