@@ -1,0 +1,8 @@
+# User-defined filter file for Privoxy
+# Add your custom filters here
+#
+# Example filter:
+# FILTER: my-custom-filter Description of what this filter does
+# s@pattern@replacement@flags
+#
+# This file is empty by default - add your own filters as needed 

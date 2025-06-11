@@ -16,9 +16,6 @@ logfile privoxy.log
 debug 1    # Show each request
 debug 1024 # Log the destination for requests Privoxy didn't let through
 
-# Trust all X-Forwarded-For headers for logging purposes  
-trust-info-url-prefix http://
-
 # Don't split large files when downloading
 split-large-forms 0
 
@@ -47,7 +44,7 @@ forwarded-connect-retries 2
 
 # Security settings
 enforce-blocks 0
-compression 1
 
-# Hide user agent for privacy
-hide-user-agent yes 
+# Hostname and admin contact (optional)
+hostname nzbgetvpn-privoxy
+admin-address admin@localhost 

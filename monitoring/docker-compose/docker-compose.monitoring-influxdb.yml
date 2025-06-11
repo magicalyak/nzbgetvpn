@@ -1,0 +1,89 @@
+version: "3.8"
+
+services:
+  # Your existing nzbgetvpn service
+  nzbgetvpn:
+    image: magicalyak/nzbgetvpn:latest
+    container_name: nzbgetvpn
+    env_file: ../../.env
+    ports:
+      - "6789:6789"          # NZBGet Web UI
+      - "8080:8080"          # Monitoring
+    volumes:
+      - ../../config:/config
+      - ../../downloads:/downloads
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    devices:
+      - /dev/net/tun
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+    restart: unless-stopped
+    networks:
+      - monitoring
+
+  # InfluxDB2
+  influxdb:
+    image: influxdb:2.7
+    container_name: influxdb
+    ports:
+      - "8086:8086"
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+      - influxdb_config:/etc/influxdb2
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=password123
+      - DOCKER_INFLUXDB_INIT_ORG=nzbgetvpn
+      - DOCKER_INFLUXDB_INIT_BUCKET=metrics
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=nzbgetvpn-monitoring-token
+    restart: unless-stopped
+    networks:
+      - monitoring
+
+  # Telegraf for metric collection
+  telegraf:
+    image: telegraf:1.28
+    container_name: telegraf
+    volumes:
+      - ../telegraf.conf:/etc/telegraf/telegraf.conf:ro
+    environment:
+      - INFLUX_TOKEN=nzbgetvpn-monitoring-token
+      - INFLUX_ORG=nzbgetvpn
+      - INFLUX_BUCKET=metrics
+    restart: unless-stopped
+    depends_on:
+      - influxdb
+      - nzbgetvpn
+    networks:
+      - monitoring
+
+  # Grafana for visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ../grafana-influx/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ../grafana-influx/datasources:/etc/grafana/provisioning/datasources:ro
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_USERS_ALLOW_SIGN_UP=false
+    restart: unless-stopped
+    depends_on:
+      - influxdb
+    networks:
+      - monitoring
+
+volumes:
+  influxdb_data:
+  influxdb_config:
+  grafana_data:
+
+networks:
+  monitoring:
+    driver: bridge 

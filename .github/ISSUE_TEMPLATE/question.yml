@@ -1,60 +1,30 @@
-name: ❓ Question or Help
-description: Ask a question about setup, configuration, or usage
+name: ❓ Question
+description: Ask a question or get help
 title: "[QUESTION] "
-labels: ["question", "help wanted"]
+labels: ["question"]
 
 body:
   - type: markdown
     attributes:
       value: |
-        Need help with nzbgetvpn? Please provide as much detail as possible so we can assist you effectively.
-
-  - type: checkboxes
-    id: checklist
-    attributes:
-      label: Pre-submission Checklist
-      description: Please verify these items before asking your question
-      options:
-        - label: I have searched existing issues for similar questions
-          required: true
-        - label: I have read the README.md documentation thoroughly
-          required: true
-        - label: I have checked the container logs for error messages
-          required: true
+        Have a question? We're here to help!
 
   - type: textarea
     id: question
     attributes:
-      label: Your Question
-      description: What would you like help with?
-      placeholder: "Ask your question here. Be as specific as possible..."
-    validations:
-      required: true
-
-  - type: input
-    id: version
-    attributes:
-      label: nzbgetvpn Version
-      description: Which version/tag are you using?
-      placeholder: "Example: v25.0.20 or latest"
+      label: What's your question?
+      description: Describe what you need help with
+      placeholder: "Example: How do I configure XYZ VPN provider?"
     validations:
       required: true
 
   - type: textarea
-    id: logs
+    id: context
     attributes:
-      label: Relevant Logs (if applicable)
-      description: Any relevant log output
-      render: text
+      label: Additional context
+      description: Any relevant configuration, logs, or other details
       placeholder: |
-        Paste relevant log snippets here. Get logs with:
-        docker logs <container-name>
-        or
-        docker-compose logs nzbgetvpn
-
-  - type: textarea
-    id: additional-context
-    attributes:
-      label: Additional Context
-      description: Please provide your configuration, what you've already tried, and any other relevant information.
-      placeholder: "Paste your docker-compose.yml, docker run command, or any other configuration here. Please be sure to redact any sensitive information." 
+        Include any relevant:
+        - Configuration files (remove sensitive info)
+        - Error messages or logs
+        - What you've already tried 
