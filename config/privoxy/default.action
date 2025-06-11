@@ -1,0 +1,15 @@
+# default.action - Default actions for Privoxy
+# Simple configuration that won't break most websites
+
+# Default settings - minimal filtering, basic privacy
+{-block +hide-user-agent{Mozilla/5.0 (nzbgetvpn proxy)} +hide-referrer{conditional-block}}
+# Apply to all requests
+/
+
+# Block known ad/tracking domains
+{+block +handle-as-empty-document}
+.doubleclick.net
+.googleadservices.com
+.googlesyndication.com
+.amazon-adsystem.com
+.facebook.com/tr/ 
