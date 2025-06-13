@@ -1,0 +1,56 @@
+#!/command/with-contenv bash
+# shellcheck disable=SC1008
+# s6-rc script for OpenVPN
+
+# Exit if VPN is not enabled or not OpenVPN
+if [[ "${VPN_CLIENT,,}" != "openvpn" ]]; then
+  echo "[INFO] OpenVPN service disabled (VPN_CLIENT is not 'openvpn')"
+  exit 111 # Exit with 111 to tell s6-rc this service is permanently down
+fi
+
+# Wait for VPN setup to complete
+SETUP_TIMEOUT=120
+SETUP_FLAG="/tmp/vpn_setup_complete"
+SECONDS=0
+
+echo "[INFO] Waiting for VPN setup to complete..."
+while [ ! -f "$SETUP_FLAG" ]; do
+  if [ "$SECONDS" -ge "$SETUP_TIMEOUT" ]; then
+    echo "[ERROR] Timeout waiting for VPN setup to complete"
+    exit 1
+  fi
+  sleep 1
+done
+
+echo "[INFO] VPN setup completed, checking OpenVPN configuration..."
+
+# Check if OpenVPN config exists
+TEMP_OVPN_CONFIG="/tmp/config.ovpn"
+if [ ! -f "$TEMP_OVPN_CONFIG" ]; then
+  echo "[ERROR] OpenVPN config file $TEMP_OVPN_CONFIG not found"
+  exit 1
+fi
+
+# Check if credentials exist
+if [ ! -f "/tmp/vpn-credentials" ]; then
+  echo "[ERROR] VPN credentials file not found"
+  exit 1
+fi
+
+# Get VPN interface name
+VPN_INTERFACE_FILE="/tmp/vpn_interface_name"
+if [ -f "$VPN_INTERFACE_FILE" ]; then
+  VPN_INTERFACE=$(cat "$VPN_INTERFACE_FILE")
+else
+  VPN_INTERFACE="tun0"
+fi
+
+echo "[INFO] Starting OpenVPN service with interface $VPN_INTERFACE"
+
+# Kill any existing OpenVPN processes (in case of restart)
+pkill -f "openvpn.*$TEMP_OVPN_CONFIG" || true
+
+# Start OpenVPN in foreground mode for s6 supervision
+exec openvpn --config "$TEMP_OVPN_CONFIG" \
+            --dev "$VPN_INTERFACE" \
+            ${VPN_OPTIONS} 

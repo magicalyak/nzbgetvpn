@@ -119,20 +119,24 @@ COPY config/privoxy/*.action /etc/privoxy/
 COPY root_s6/privoxy/run /etc/s6-overlay/s6-rc.d/privoxy/run
 COPY root_s6/monitoring/run /etc/s6-overlay/s6-rc.d/monitoring/run
 COPY root_s6/auto-restart/run /etc/s6-overlay/s6-rc.d/auto-restart/run
+COPY root_s6/openvpn/run /etc/s6-overlay/s6-rc.d/openvpn/run
+COPY root_s6/openvpn/type /etc/s6-overlay/s6-rc.d/openvpn/type
 
 # Setup s6-overlay services
 RUN mkdir -p /etc/s6-overlay/s6-rc.d/user/contents.d && \
     echo "longrun" > /etc/s6-overlay/s6-rc.d/privoxy/type && \
     echo "longrun" > /etc/s6-overlay/s6-rc.d/monitoring/type && \
     echo "longrun" > /etc/s6-overlay/s6-rc.d/auto-restart/type && \
+
     touch /etc/s6-overlay/s6-rc.d/user/contents.d/privoxy && \
     touch /etc/s6-overlay/s6-rc.d/user/contents.d/monitoring && \
-    touch /etc/s6-overlay/s6-rc.d/user/contents.d/auto-restart
+    touch /etc/s6-overlay/s6-rc.d/user/contents.d/auto-restart && \
+    touch /etc/s6-overlay/s6-rc.d/user/contents.d/openvpn
 
 # Make scripts executable
 RUN chmod +x /etc/cont-init.d/* /root/healthcheck.sh /root/monitoring-server.py /root/auto-restart.sh \
     /root/platform-info.sh /etc/s6-overlay/s6-rc.d/privoxy/run /etc/s6-overlay/s6-rc.d/monitoring/run \
-    /etc/s6-overlay/s6-rc.d/auto-restart/run
+    /etc/s6-overlay/s6-rc.d/auto-restart/run /etc/s6-overlay/s6-rc.d/openvpn/run
 
 # Enhanced healthcheck with more frequent checks and longer timeout for monitoring features
 HEALTHCHECK --interval=30s --timeout=15s --start-period=2m --retries=3 \

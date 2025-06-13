@@ -221,6 +221,13 @@ EOF
   # Modify OVPN config on the fly for auth-user-pass and script security
   TEMP_OVPN_CONFIG="/tmp/config.ovpn"
   cp "$OVPN_CONFIG_FILE" "$TEMP_OVPN_CONFIG"
+  
+  # Ensure the config file ends with a newline to prevent formatting issues
+  # Add newline if the file doesn't end with one
+  sed -i -e '$a\' "$TEMP_OVPN_CONFIG"
+  # Alternative fix: explicitly add newline before our additions
+  printf '\n' >> "$TEMP_OVPN_CONFIG"
+  
   # Ensure auth-user-pass points to our standard credentials file
   if grep -q "^auth-user-pass" "$TEMP_OVPN_CONFIG"; then
     sed -i 's|^auth-user-pass.*|auth-user-pass /tmp/vpn-credentials|' "$TEMP_OVPN_CONFIG"
@@ -247,37 +254,9 @@ EOF
   fi
 
 
-  echo "[INFO] Starting OpenVPN client..."
-  # Using exec to replace the shell process with openvpn is not suitable here as we need to run commands after it.
-  # Run OpenVPN in the background. s6 will manage its lifecycle if needed as part of this init script.
-  openvpn --config "$TEMP_OVPN_CONFIG" \
-          --dev "$(cat $VPN_INTERFACE_FILE)" \
-          ${VPN_OPTIONS} > /tmp/openvpn.log 2>&1 &
-
-  # Wait for the 'up' script to complete by checking for the flag file
-  echo "[INFO] Waiting for OpenVPN 'up' script to complete (expect /tmp/openvpn_up_complete)..."
-  UP_SCRIPT_TIMEOUT=60 # seconds
-  UP_SCRIPT_FLAG="/tmp/openvpn_up_complete"
-  SECONDS=0
-  while [ ! -f "$UP_SCRIPT_FLAG" ]; do
-    if [ "$SECONDS" -ge "$UP_SCRIPT_TIMEOUT" ]; then
-      echo "[ERROR] Timeout waiting for OpenVPN 'up' script to create $UP_SCRIPT_FLAG."
-      echo "OpenVPN log (/tmp/openvpn.log) contents:"
-      cat /tmp/openvpn.log
-      echo "update-resolv.sh log (/tmp/openvpn_script.log) contents (if any):"
-      cat /tmp/openvpn_script.log || echo "No /tmp/openvpn_script.log found."
-      exit 1
-    fi
-    sleep 1
-  done
-  echo "[INFO] OpenVPN 'up' script completed (flag file found)."
-  VPN_INTERFACE_FROM_UP_SCRIPT=$(awk -F': ' '/Interface: / {print $2}' "$UP_SCRIPT_FLAG" | tr -d '\r')
-  if [ -n "$VPN_INTERFACE_FROM_UP_SCRIPT" ]; then
-      echo "$VPN_INTERFACE_FROM_UP_SCRIPT" > "$VPN_INTERFACE_FILE"
-      echo "[INFO] VPN interface updated from 'up' script: $(cat $VPN_INTERFACE_FILE)"
-  else
-      echo "[WARN] Could not determine VPN interface from up script. Using default: $(cat $VPN_INTERFACE_FILE)"
-  fi
+  echo "[INFO] OpenVPN configuration prepared. Service will be started by s6-overlay."
+  echo "[INFO] Configuration file: $TEMP_OVPN_CONFIG"
+  echo "[INFO] VPN interface: $(cat $VPN_INTERFACE_FILE)"
 
 }
 
@@ -336,46 +315,10 @@ else
   exit 1
 fi
 
-# Wait for VPN interface to be up and have an IP
+# VPN interface setup will be handled by the s6 service
 VPN_INTERFACE=$(cat "$VPN_INTERFACE_FILE")
-echo "[INFO] Waiting for VPN interface $VPN_INTERFACE to come up and get an IP address..."
-TIMEOUT=60 # seconds
-SECONDS=0
-while true; do
-  # Check for interface existence and UP state broadly
-  if ! ip link show "$VPN_INTERFACE" | grep -q "state UP"; then
-    # For tun devices, state might be UNKNOWN but still functional if it has an IP
-    if ! (ip addr show "$VPN_INTERFACE" | grep -q "inet ") && ! (ip link show "$VPN_INTERFACE" | grep -q "state UNKNOWN"); then
-        echo "[DEBUG] Interface $VPN_INTERFACE not UP yet or no IP. Waiting..."
-    elif ! (ip addr show "$VPN_INTERFACE" | grep -q "inet "); then
-        echo "[DEBUG] Interface $VPN_INTERFACE is UP but no IP address yet. Waiting..."
-    else # Has IP
-        echo "[INFO] Interface $VPN_INTERFACE has an IP address."
-        break
-    fi
-  else # State is UP
-    # Now check for IP specifically
-    if ip addr show "$VPN_INTERFACE" | grep -q "inet "; then
-        echo "[INFO] Interface $VPN_INTERFACE is UP and has an IP address."
-        break
-    else
-        echo "[DEBUG] Interface $VPN_INTERFACE is UP but no IP address yet. Waiting..."
-    fi
-  fi
-
-  if [ "$SECONDS" -ge "$TIMEOUT" ]; then
-    echo "[ERROR] Timeout waiting for $VPN_INTERFACE to come up and get an IP."
-    echo "Details for interface $VPN_INTERFACE:"
-    ip addr show "$VPN_INTERFACE" || echo "Interface $VPN_INTERFACE not found."
-    if [ "${VPN_CLIENT,,}" = "openvpn" ]; then
-        echo "OpenVPN log (/tmp/openvpn.log) contents:"
-        cat /tmp/openvpn.log || echo "No /tmp/openvpn.log"
-    fi
-    exit 1
-  fi
-  sleep 1
-done
-echo "[INFO] VPN interface $VPN_INTERFACE is active."
+echo "[INFO] VPN interface configuration: $VPN_INTERFACE"
+echo "[INFO] Note: VPN connection will be established by the OpenVPN s6 service"
 
 # --- IPTables and Routing ---
 echo "[INFO] Configuring iptables and routing rules..."
