@@ -441,11 +441,66 @@ fi
 
 # All other OUTPUT traffic must go through VPN interface or be dropped
 iptables -A OUTPUT -o "$VPN_INTERFACE" -j ACCEPT
-iptables -A OUTPUT -o eth0 -j DROP # Drop if trying to go out eth0 and not LAN/PBR
-# Could also be more strict: iptables -A OUTPUT ! -o "$VPN_INTERFACE" -j DROP
-# but the above allows things like established connections already handled.
-echo "[INFO] Default OUTPUT traffic routed through $VPN_INTERFACE. Other outbound on eth0 (non-LAN, non-PBR) dropped."
 
+# CRITICAL FIX: Allow VPN server connectivity before applying kill switch
+# This prevents the chicken-and-egg problem where the kill switch blocks
+# the UDP traffic needed to establish the VPN connection
+if [ "${VPN_CLIENT,,}" = "openvpn" ]; then
+  echo "[INFO] Extracting VPN server details from OpenVPN config for kill switch exception..."
+  TEMP_OVPN_CONFIG="/tmp/config.ovpn"
+  
+  if [ -f "$TEMP_OVPN_CONFIG" ]; then
+    # Extract remote server and port from OpenVPN config
+    VPN_SERVER_INFO=$(grep -E "^remote " "$TEMP_OVPN_CONFIG" | head -1)
+    if [ -n "$VPN_SERVER_INFO" ]; then
+      VPN_SERVER_HOST=$(echo "$VPN_SERVER_INFO" | awk '{print $2}')
+      VPN_SERVER_PORT=$(echo "$VPN_SERVER_INFO" | awk '{print $3}')
+      VPN_SERVER_PROTO=$(echo "$VPN_SERVER_INFO" | awk '{print $4}')
+      
+      # Default to UDP port 1194 if not specified
+      [ -z "$VPN_SERVER_PORT" ] && VPN_SERVER_PORT="1194"
+      [ -z "$VPN_SERVER_PROTO" ] && VPN_SERVER_PROTO="udp"
+      
+      echo "[INFO] VPN server: $VPN_SERVER_HOST:$VPN_SERVER_PORT ($VPN_SERVER_PROTO)"
+      
+      # Resolve hostname to IP if needed (DNS should work at this point)
+      if echo "$VPN_SERVER_HOST" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
+        VPN_SERVER_IP="$VPN_SERVER_HOST"
+      else
+        echo "[INFO] Resolving VPN server hostname: $VPN_SERVER_HOST"
+        VPN_SERVER_IP=$(nslookup "$VPN_SERVER_HOST" | awk '/^Address: / { print $2 }' | head -1)
+        if [ -z "$VPN_SERVER_IP" ]; then
+          # Fallback to getent hosts
+          VPN_SERVER_IP=$(getent hosts "$VPN_SERVER_HOST" | awk '{print $1}' | head -1)
+        fi
+      fi
+      
+      if [ -n "$VPN_SERVER_IP" ]; then
+        echo "[INFO] Adding kill switch exception for VPN server: $VPN_SERVER_IP:$VPN_SERVER_PORT ($VPN_SERVER_PROTO)"
+        iptables -A OUTPUT -d "$VPN_SERVER_IP" -p "$VPN_SERVER_PROTO" --dport "$VPN_SERVER_PORT" -j ACCEPT
+        echo "[INFO] VPN server connectivity exception added successfully"
+      else
+        echo "[WARN] Could not resolve VPN server IP for $VPN_SERVER_HOST. VPN connection may fail to establish."
+      fi
+    else
+      echo "[WARN] No 'remote' directive found in OpenVPN config. Using fallback exception for common VPN ports."
+      # Fallback: allow common OpenVPN ports
+      iptables -A OUTPUT -p udp --dport 1194 -j ACCEPT
+      iptables -A OUTPUT -p tcp --dport 1194 -j ACCEPT
+    fi
+  else
+    echo "[WARN] OpenVPN config file not found at $TEMP_OVPN_CONFIG. Adding fallback VPN port exceptions."
+    # Fallback: allow common OpenVPN ports
+    iptables -A OUTPUT -p udp --dport 1194 -j ACCEPT
+    iptables -A OUTPUT -p tcp --dport 1194 -j ACCEPT
+  fi
+elif [ "${VPN_CLIENT,,}" = "wireguard" ]; then
+  echo "[INFO] WireGuard detected. Adding standard WireGuard port exception (51820/udp)."
+  iptables -A OUTPUT -p udp --dport 51820 -j ACCEPT
+fi
+
+iptables -A OUTPUT -o eth0 -j DROP # Drop if trying to go out eth0 and not LAN/PBR
+echo "[INFO] Default OUTPUT traffic routed through $VPN_INTERFACE. Other outbound on eth0 (non-LAN, non-PBR) dropped."
 
 # Privoxy: Apply firewall and PBR rules if enabled (s6 will start the service)
 if [ "${ENABLE_PRIVOXY,,}" = "yes" ] || [ "${ENABLE_PRIVOXY,,}" = "true" ]; then

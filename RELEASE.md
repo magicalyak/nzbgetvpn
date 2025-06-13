@@ -1,3 +1,42 @@
+# nzbgetvpn Release Notes
+
+## v25.0.27 (2025-06-13)
+**Fix: VPN Kill Switch Chicken-and-Egg Problem**
+
+### 🔧 Critical Fix
+- **Fixed VPN connection failure**: Resolved the chicken-and-egg problem where the VPN kill switch blocked the UDP traffic needed to establish the VPN connection
+- **Smart kill switch logic**: Now extracts VPN server details from OpenVPN config and allows connectivity to VPN server before applying traffic blocking rules
+- **Auto-detection**: Automatically detects and allows traffic to the specific VPN server IP and port from the config file
+- **Multi-protocol support**: Handles both UDP and TCP VPN connections
+- **WireGuard support**: Includes exception for standard WireGuard port (51820/udp)
+
+### 🛡️ Security & Reliability
+- **Maintains security**: Kill switch still blocks all non-VPN traffic, preventing IP leaks
+- **Graceful fallbacks**: If server detection fails, adds exceptions for common VPN ports (1194)
+- **DNS resolution**: Resolves VPN hostnames to IP addresses for precise firewall rules
+
+### 🐛 Bug Fixes
+- **Resolves monitoring "unhealthy" status**: VPN can now connect properly, allowing health monitoring to show correct status
+- **Eliminates container startup failures**: No more VPN connection timeouts during container startup
+- **Fixes transmission UDP blocking**: Resolves similar issues affecting other VPN-enabled containers
+
+### 📋 Technical Details
+The root cause was that the VPN kill switch (`iptables -A OUTPUT -o eth0 -j DROP`) was blocking ALL outbound traffic on eth0, including the UDP packets needed for OpenVPN to connect to the VPN server. This created a circular dependency:
+1. Kill switch blocks UDP → VPN can't connect
+2. VPN can't connect → tun0 interface never created  
+3. No tun0 → traffic remains blocked by kill switch
+
+The fix adds a specific exception rule (`iptables -A OUTPUT -d $VPN_SERVER_IP -p udp --dport $VPN_SERVER_PORT -j ACCEPT`) before the DROP rule.
+
+### 🔄 Upgrade Path
+- **Automatic**: Existing containers will get the fix on restart
+- **No configuration changes required**
+- **Maintains compatibility**: All existing VPN configs continue to work
+
+---
+
+## v25.0.26 (2025-06-13)
+
 # Release Instructions - Fixed Version with Monitoring
 
 This document outlines the process for creating and releasing the fixed version of nzbgetvpn with BusyBox compatibility and enhanced monitoring.

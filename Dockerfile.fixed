@@ -10,9 +10,9 @@ RUN sed -i 's|grep -oP '\''inet \\K\[^/\]\+'\''|sed -n "s/.*inet \\([0-9.]*\\).*
 RUN chmod +x /root/healthcheck.sh /root/monitoring-server.py
 
 # Add metadata
-LABEL maintainer="nzbgetvpn" \
-      version="v25.0.25" \
-      description="NZBGet with VPN and Prometheus monitoring - BusyBox compatibility fixes" \
+LABEL maintainer="Tom Gamull <tom@gamull.com>" \
+      version="v25.0.27" \
+      description="NZBGet with VPN and monitoring support - Fixed kill switch prevents VPN connection chicken-and-egg problem" \
       org.opencontainers.image.title="nzbgetvpn" \
       org.opencontainers.image.description="Secure NZBGet downloads with VPN protection and monitoring" \
       org.opencontainers.image.version="v25.0.25" \
