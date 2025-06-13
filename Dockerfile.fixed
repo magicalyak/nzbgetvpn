@@ -11,11 +11,11 @@ RUN chmod +x /root/healthcheck.sh /root/monitoring-server.py
 
 # Add metadata
 LABEL maintainer="Tom Gamull <tom@gamull.com>" \
-      version="v25.0.27" \
-      description="NZBGet with VPN and monitoring support - Fixed kill switch prevents VPN connection chicken-and-egg problem" \
+      version="v25.0.28" \
+      description="NZBGet with VPN and monitoring support - Fixed kill switch and monitoring port access" \
       org.opencontainers.image.title="nzbgetvpn" \
       org.opencontainers.image.description="Secure NZBGet downloads with VPN protection and monitoring" \
-      org.opencontainers.image.version="v25.0.25" \
+      org.opencontainers.image.version="v25.0.28" \
       org.opencontainers.image.source="https://github.com/magicalyak/nzbgetvpn" \
       org.opencontainers.image.url="https://hub.docker.com/r/magicalyak/nzbgetvpn" \
       org.opencontainers.image.documentation="https://github.com/magicalyak/nzbgetvpn/blob/main/README.md" \

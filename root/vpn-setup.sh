@@ -375,6 +375,10 @@ echo "[INFO] Allowed established/related connections."
 iptables -A INPUT -i eth0 -p tcp --dport 6789 -j ACCEPT
 echo "[INFO] Added iptables rule to allow NZBGet UI on eth0:6789."
 
+# Allow monitoring access from host 
+iptables -A INPUT -i eth0 -p tcp --dport 8080 -j ACCEPT
+echo "[INFO] Added iptables rule to allow monitoring on eth0:8080."
+
 # Policy routing for NZBGet UI & Privoxy when accessed from host
 # This ensures replies to connections hitting eth0 go back out via eth0 gateway, not VPN tunnel
 echo "[INFO] Adding CONNMARK policy routing for UI access (mark 0x1, table 100)"

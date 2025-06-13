@@ -1,5 +1,61 @@
 # nzbgetvpn Release Notes
 
+## v25.0.28 (2024-12-19)
+**Fix: Monitoring Port Access**
+
+### 🔧 Critical Fix
+- **Added missing monitoring INPUT rule**: VPN setup script now includes `iptables -A INPUT -i eth0 -p tcp --dport 8080 -j ACCEPT`
+- **External monitoring access**: Monitoring endpoint now accessible from outside container without manual intervention
+- **Out-of-the-box functionality**: No more need for manual firewall rule additions after deployment
+
+### 🛡️ Security & Reliability  
+- **Maintains VPN security**: Only adds necessary rule for monitoring port 8080
+- **Consistent with other ports**: Follows same pattern as NZBGet UI (6789) and Privoxy (8118) rules
+- **Automatic application**: Rule applied during VPN setup, no user intervention required
+
+### 🐛 Bug Fixes
+- **Resolves monitoring access issues**: External health checks and dashboards now work immediately
+- **Eliminates manual fixes**: No more need to manually add iptables INPUT rules
+- **Consistent container behavior**: All exposed ports now properly accessible
+
+### 📋 Technical Details
+The monitoring port (8080) was missing an INPUT iptables rule, causing external access to be blocked even though the port was exposed. The VPN setup script already included INPUT rules for:
+- Port 6789 (NZBGet UI) ✅
+- Port 8118 (Privoxy) ✅
+- Port 8080 (Monitoring) ❌ **[NOW FIXED]**
+
+This release adds the missing rule to ensure consistency and immediate functionality.
+
+---
+
+## v25.0.28 (2024-12-19)
+**Fix: Monitoring Port Access**
+
+### 🔧 Critical Fix
+- **Added missing monitoring INPUT rule**: VPN setup script now includes `iptables -A INPUT -i eth0 -p tcp --dport 8080 -j ACCEPT`
+- **External monitoring access**: Monitoring endpoint now accessible from outside container without manual intervention
+- **Out-of-the-box functionality**: No more need for manual firewall rule additions after deployment
+
+### 🛡️ Security & Reliability  
+- **Maintains VPN security**: Only adds necessary rule for monitoring port 8080
+- **Consistent with other ports**: Follows same pattern as NZBGet UI (6789) and Privoxy (8118) rules
+- **Automatic application**: Rule applied during VPN setup, no user intervention required
+
+### 🐛 Bug Fixes
+- **Resolves monitoring access issues**: External health checks and dashboards now work immediately
+- **Eliminates manual fixes**: No more need to manually add iptables INPUT rules
+- **Consistent container behavior**: All exposed ports now properly accessible
+
+### 📋 Technical Details
+The monitoring port (8080) was missing an INPUT iptables rule, causing external access to be blocked even though the port was exposed. The VPN setup script already included INPUT rules for:
+- Port 6789 (NZBGet UI) ✅
+- Port 8118 (Privoxy) ✅
+- Port 8080 (Monitoring) ❌ **[NOW FIXED]**
+
+This release adds the missing rule to ensure consistency and immediate functionality.
+
+---
+
 ## v25.0.27 (2025-06-13)
 **Fix: VPN Kill Switch Chicken-and-Egg Problem**
 
