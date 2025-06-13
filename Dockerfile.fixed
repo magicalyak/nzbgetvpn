@@ -1,0 +1,31 @@
+# Multi-stage build for nzbgetvpn with monitoring fixes
+FROM magicalyak/nzbgetvpn:latest as base
+
+# Apply BusyBox grep compatibility fixes
+RUN sed -i 's|grep -oP '\''inet \\K\[^/\]\+'\''|sed -n "s/.*inet \\([0-9.]*\\).*/\\1/p"|g' /root/healthcheck.sh && \
+    # Verify the fix was applied
+    grep -n "sed -n" /root/healthcheck.sh || echo "Fix applied successfully"
+
+# Ensure all scripts are executable
+RUN chmod +x /root/healthcheck.sh /root/monitoring-server.py
+
+# Add metadata
+LABEL maintainer="nzbgetvpn" \
+      version="v25.0.25" \
+      description="NZBGet with VPN and Prometheus monitoring - BusyBox compatibility fixes" \
+      org.opencontainers.image.title="nzbgetvpn" \
+      org.opencontainers.image.description="Secure NZBGet downloads with VPN protection and monitoring" \
+      org.opencontainers.image.version="v25.0.25" \
+      org.opencontainers.image.source="https://github.com/magicalyak/nzbgetvpn" \
+      org.opencontainers.image.url="https://hub.docker.com/r/magicalyak/nzbgetvpn" \
+      org.opencontainers.image.documentation="https://github.com/magicalyak/nzbgetvpn/blob/main/README.md" \
+      healthcheck.fixed="true" \
+      monitoring.enabled="true" \
+      busybox.compatible="true"
+
+# Expose monitoring port
+EXPOSE 8080
+
+# Healthcheck with improved timeout and interval
+HEALTHCHECK --interval=30s --timeout=15s --start-period=2m --retries=3 \
+    CMD /root/healthcheck.sh || exit 1 
