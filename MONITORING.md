@@ -327,10 +327,16 @@ Notifications are sent for:
 **prometheus.yml:**
 ```yaml
 scrape_configs:
-  - job_name: 'nzbgetvpn'
+  - job_name: 'nzbgetvpn-metrics'
     static_configs:
-      - targets: ['nzbgetvpn:8080']
+      - targets: ['your-host:8080']
     metrics_path: '/prometheus'
+    scrape_interval: 30s
+
+  - job_name: 'nzbgetvpn-health'
+    static_configs:
+      - targets: ['your-host:8080']
+    metrics_path: '/health'
     scrape_interval: 30s
 ```
 

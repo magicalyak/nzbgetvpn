@@ -12,8 +12,9 @@
 - 🌐 **VPN Protocol Support** - Both OpenVPN and WireGuard
 - 🏗️ **Multi-Platform** - Works on x86, ARM64 (Raspberry Pi, Apple Silicon)
 - ⚙️ **Auto-Configuration** - Set up your news server via environment variables
-- 📊 **Built-in Monitoring** - Health checks and metrics endpoints
+- 📊 **Built-in Monitoring** - Health checks and Prometheus metrics endpoints
 - 🔄 **Self-Healing** - Automatic restart on VPN/service failures
+- 🐧 **BusyBox Compatible** - Works reliably across all Linux distributions
 
 ## 🚀 Quick Start
 
@@ -285,7 +286,109 @@ Download configs: [Privado VPN Manual Setup](https://privadovpn.com/support/manu
 
 </details>
 
-## 📊 Enhanced Monitoring & Auto-Restart
+## 📊 Monitoring with Prometheus & Grafana
+
+nzbgetvpn includes comprehensive monitoring capabilities with Prometheus metrics, health checks, and status endpoints.
+
+### Quick Monitoring Setup
+
+**1. Enable monitoring in your `.env` file:**
+```bash
+ENABLE_MONITORING=yes
+MONITORING_PORT=8080
+```
+
+**2. Expose monitoring port in docker-compose.yml:**
+```yaml
+ports:
+  - "6789:6789"    # NZBGet
+  - "8080:8080"    # Monitoring
+```
+
+**3. Configure Prometheus to scrape metrics:**
+```yaml
+# Add to your prometheus.yml
+scrape_configs:
+  - job_name: 'nzbgetvpn-metrics'
+    static_configs:
+      - targets: ['your-host:8080']
+    metrics_path: '/prometheus'
+    scrape_interval: 30s
+```
+
+### Available Endpoints
+
+| Endpoint | Description | Format |
+|----------|-------------|--------|
+| `/health` | Current health status | JSON |
+| `/prometheus` | Prometheus metrics | Text |
+| `/status` | Detailed system info | JSON |
+| `/metrics` | Historical metrics | JSON |
+
+### Example Health Response
+
+```json
+{
+  "timestamp": "2025-06-13T15:30:00Z",
+  "status": "healthy",
+  "exit_code": 0,
+  "vpn_interface": "tun0", 
+  "external_ip": "172.21.20.27",
+  "checks": {
+    "nzbget": "success",
+    "vpn_interface": "up",
+    "dns": "success",
+    "news_server": "success"
+  }
+}
+```
+
+### Prometheus Metrics
+
+The container provides these key metrics:
+
+- `nzbgetvpn_health_check` - Overall health (1=healthy, 0=unhealthy)
+- `nzbgetvpn_check{check="service"}` - Individual service status
+- `nzbgetvpn_response_time_seconds` - Response times for health checks
+- `nzbgetvpn_success_rate_percent` - Success rates by service
+
+### Docker Compose with Monitoring Stack
+
+```yaml
+version: '3.8'
+services:
+  nzbgetvpn:
+    image: magicalyak/nzbgetvpn:latest
+    devices:
+      - /dev/net/tun
+    cap_add:
+      - NET_ADMIN
+    environment:
+      - ENABLE_MONITORING=yes
+      - VPN_CLIENT=openvpn
+      - VPN_CONFIG=/config/openvpn/your-provider.ovpn
+    ports:
+      - "6789:6789"
+      - "8080:8080"
+
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+```
+
+**👉 Complete monitoring guide:** [MONITORING.md](MONITORING.md)
+
+## 🔧 Enhanced Monitoring & Auto-Restart
 
 Enable advanced monitoring and automatic service recovery:
 
@@ -298,13 +401,11 @@ RESTART_COOLDOWN_SECONDS=300
 NOTIFICATION_WEBHOOK_URL=https://discord.com/api/webhooks/YOUR_WEBHOOK
 ```
 
-**Monitoring endpoints:**
-- `http://localhost:8080/` - Dashboard
-- `http://localhost:8080/health` - Health status
-- `http://localhost:8080/metrics` - Metrics
-- `http://localhost:8080/prometheus` - Prometheus metrics
-
-**👉 Full guide:** [MONITORING.md](MONITORING.md)
+**Auto-restart features:**
+- Automatically restarts VPN connection if it fails
+- Monitors NZBGet health and restarts if needed
+- Configurable cooldown periods to prevent restart loops
+- Discord/Slack notifications for service events
 
 ## 🏗️ Multi-Architecture Support
 
@@ -385,6 +486,30 @@ See [.env.sample](.env.sample) for complete list with examples.
 
 </details>
 
+## 🛠️ Building Fixed Version
+
+If you encounter issues with the standard image, we provide a fixed version with BusyBox compatibility improvements:
+
+```bash
+# Build the fixed version
+chmod +x build-fixed.sh
+./build-fixed.sh
+
+# Use the fixed image
+docker-compose.yml:
+  image: magicalyak/nzbgetvpn:fixed
+```
+
+The fixed version includes:
+- ✅ **BusyBox grep compatibility** - Fixes health check issues on some systems
+- ✅ **Enhanced monitoring** - Improved Prometheus metrics collection  
+- ✅ **Better VPN integration** - Resolved device mapping issues
+
+**When to use the fixed version:**
+- Health checks show "unknown" status despite working VPN
+- Monitoring endpoints return incomplete data
+- Running on systems with BusyBox utilities (Alpine, some routers)
+
 ## 🔧 Building from Source
 
 ```bash
@@ -421,6 +546,11 @@ docker build -t my-nzbgetvpn .
 **Permission errors:**
 - Verify PUID/PGID match your user
 - Check directory ownership
+
+**Monitoring shows "unknown" status:**
+- Try the fixed image: `magicalyak/nzbgetvpn:fixed`
+- Check if `/dev/net/tun` device is mapped correctly
+- Enable debug logging: `DEBUG=true`
 
 **👉 Full troubleshooting guide:** [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 

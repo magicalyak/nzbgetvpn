@@ -13,11 +13,11 @@ services:
       # Adjust these paths to match your setup
       - ./config:/config     # NZBGet config and VPN files
       - ./downloads:/downloads # Downloads directory
+    devices:
+      - /dev/net/tun         # Required for VPN functionality
     cap_add:
       - NET_ADMIN
       - SYS_MODULE
-    devices:
-      - /dev/net/tun
     sysctls:
       - net.ipv4.conf.all.src_valid_mark=1
     restart: unless-stopped
@@ -28,6 +28,12 @@ services:
 # 3. Place your VPN config in config/openvpn/ or config/wireguard/
 # 4. Run: docker-compose up -d
 # 5. Access NZBGet at http://localhost:6789
+
+# Monitoring Endpoints (if ENABLE_MONITORING=yes):
+# - Health check: http://localhost:8080/health
+# - Prometheus metrics: http://localhost:8080/prometheus
+# - Status info: http://localhost:8080/status
+# - Logs: http://localhost:8080/logs
 
 # Notes on Volumes:
 # The example paths `./data/config` and `./data/downloads` assume you have a 'data' subdirectory
