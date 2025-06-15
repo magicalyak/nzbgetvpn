@@ -4,15 +4,40 @@ This directory contains comprehensive monitoring setups for the nzbgetvpn contai
 
 ## Quick Start
 
-Choose one of the monitoring stacks:
+Choose one of the monitoring options:
 
-### Option 1: Prometheus + Grafana
+### Option 0: Integration with Existing Prometheus & Grafana
+
+If you already have Prometheus and Grafana running:
+
+1. **Add to your Prometheus config:**
+   ```yaml
+   scrape_configs:
+     - job_name: 'nzbgetvpn'
+       static_configs:
+         - targets: ['<nzbgetvpn-host>:8080']
+       metrics_path: '/prometheus'
+       scrape_interval: 30s
+   ```
+
+2. **Import the Grafana dashboard:**
+   - Copy `grafana/dashboards/nzbgetvpn-dashboard.json`
+   - Import via Grafana UI: Dashboards → Import → Upload JSON file
+
+3. **Reload Prometheus:**
+   ```bash
+   docker restart prometheus  # or send SIGHUP
+   ```
+
+See [docs/MONITORING_SETUP.md](docs/MONITORING_SETUP.md#-option-0-integration-with-existing-prometheus--grafana) for detailed integration instructions.
+
+### Option 1: Complete Prometheus + Grafana Stack
 ```bash
 cd docker-compose
 docker-compose -f docker-compose.monitoring-prometheus.yml up -d
 ```
 
-### Option 2: InfluxDB2 + Telegraf + Grafana
+### Option 2: Complete InfluxDB2 + Telegraf + Grafana Stack
 ```bash
 cd docker-compose
 docker-compose -f docker-compose.monitoring-influxdb.yml up -d

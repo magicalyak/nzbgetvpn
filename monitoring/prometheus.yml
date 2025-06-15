@@ -20,8 +20,6 @@ scrape_configs:
     metrics_path: '/prometheus'
     scrape_interval: 30s
     scrape_timeout: 10s
-    params:
-      format: ['prometheus']
 
   # nzbgetvpn health check (JSON endpoint converted to metrics)
   - job_name: 'nzbgetvpn-health'

@@ -35,7 +35,159 @@ Your nzbgetvpn container exposes the following monitoring endpoints on port 8080
 - **NZBGet Status**: Connectivity and responsiveness to NZBGet
 - **Download Statistics**: Available through NZBGet API integration
 
-## 🚀 Option 1: Prometheus + Grafana Setup (Recommended)
+## 🔗 Option 0: Integration with Existing Prometheus & Grafana
+
+If you already have Prometheus and Grafana running, you can easily add nzbgetvpn monitoring without deploying additional containers.
+
+### Prerequisites
+- Existing Prometheus server
+- Existing Grafana instance
+- Your nzbgetvpn container running with monitoring enabled
+
+### Step 1: Configure Prometheus Scraping
+
+Add the following job to your existing `prometheus.yml` configuration:
+
+```yaml
+scrape_configs:
+  # Add to your existing scrape_configs section
+  - job_name: 'nzbgetvpn'
+    static_configs:
+      - targets: ['<nzbgetvpn-host>:8080']  # Replace with your container's IP/hostname
+    metrics_path: '/prometheus'
+    scrape_interval: 30s
+    scrape_timeout: 10s
+
+  # Optional: Separate job for health endpoint (faster alerting)
+  - job_name: 'nzbgetvpn-health'
+    static_configs:
+      - targets: ['<nzbgetvpn-host>:8080']
+    metrics_path: '/health'
+    scrape_interval: 15s
+    scrape_timeout: 5s
+```
+
+**Finding your nzbgetvpn container IP:**
+```bash
+# If using Docker Compose
+docker inspect <compose-project>_nzbgetvpn_1 | grep IPAddress
+
+# If using standalone Docker
+docker inspect nzbgetvpn | grep IPAddress
+
+# Or use container name if on same Docker network
+# targets: ['nzbgetvpn:8080']
+```
+
+### Step 2: Reload Prometheus Configuration
+
+```bash
+# Send SIGHUP to reload config (if Prometheus supports it)
+docker kill -s HUP prometheus
+
+# Or restart Prometheus container
+docker restart prometheus
+
+# Verify targets are discovered
+# Visit http://your-prometheus:9090/targets
+```
+
+### Step 3: Import Grafana Dashboard
+
+1. **Download the dashboard JSON:**
+   ```bash
+   # From this repository
+   wget https://raw.githubusercontent.com/your-repo/nzbgetvpn/main/monitoring/grafana/dashboards/nzbgetvpn-dashboard.json
+   
+   # Or copy from your local setup
+   cp monitoring/grafana/dashboards/nzbgetvpn-dashboard.json /tmp/
+   ```
+
+2. **Import into Grafana:**
+   - Open your Grafana instance
+   - Go to **Dashboards** → **Import**
+   - Click **Upload JSON file** and select `nzbgetvpn-dashboard.json`
+   - Configure the Prometheus datasource (select your existing one)
+   - Click **Import**
+
+3. **Verify the dashboard:**
+   - Navigate to the imported "🛡️ nzbgetvpn Monitoring Dashboard"
+   - Confirm metrics are displaying correctly
+   - Adjust time range and refresh interval as needed
+
+### Step 4: Configure Alerting (Optional)
+
+Add these alerting rules to your existing Prometheus rules:
+
+```yaml
+# Add to your existing alerting rules file
+groups:
+  - name: nzbgetvpn_alerts
+    rules:
+      - alert: NZBGetVPNDown
+        expr: nzbgetvpn_health_check == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: nzbgetvpn
+        annotations:
+          summary: "nzbgetvpn container is unhealthy"
+          description: "Container has been unhealthy for more than 2 minutes"
+
+      - alert: VPNDisconnected
+        expr: nzbgetvpn_check{check="vpn_interface"} == 0
+        for: 1m
+        labels:
+          severity: warning
+          service: nzbgetvpn
+        annotations:
+          summary: "VPN connection lost"
+          description: "VPN interface check is failing"
+
+      - alert: IPLeakDetected
+        expr: nzbgetvpn_check{check="ip_leak"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          service: nzbgetvpn
+        annotations:
+          summary: "IP leak detected!"
+          description: "Traffic may be bypassing VPN - immediate attention required"
+```
+
+### Troubleshooting Integration
+
+**Metrics not appearing:**
+```bash
+# Test direct access to metrics endpoint
+curl http://<nzbgetvpn-host>:8080/prometheus
+
+# Check Prometheus targets page
+# Look for nzbgetvpn job status
+
+# Verify network connectivity
+docker exec prometheus wget -qO- http://<nzbgetvpn-host>:8080/health
+```
+
+**Dashboard shows "No data":**
+- Verify Prometheus datasource is correctly configured in Grafana
+- Check that the job name in Prometheus matches dashboard queries
+- Confirm time range covers period when container was running
+
+**Container not accessible:**
+```bash
+# If containers are on different networks, create a bridge
+docker network create monitoring
+docker network connect monitoring nzbgetvpn
+docker network connect monitoring prometheus
+
+# Or use host networking (less secure)
+# Add to nzbgetvpn: network_mode: "host"
+```
+
+## 🚀 Option 1: Complete Prometheus + Grafana Stack
+
+If you don't have existing monitoring infrastructure, use our complete stack:
 
 ### Prerequisites
 - Docker and Docker Compose installed

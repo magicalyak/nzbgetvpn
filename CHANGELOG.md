@@ -2,6 +2,38 @@
 
 All notable changes to nzbgetvpn will be documented in this file.
 
+## [v25.0.34] - 2025-01-27
+
+### 🔗 Monitoring Integration Enhancements
+- **New Integration Option**: Added comprehensive guide for existing Prometheus & Grafana setups
+  - 📋 Step-by-step Prometheus configuration for adding nzbgetvpn metrics
+  - 🎯 Container discovery commands for different Docker environments
+  - 📊 Grafana dashboard import process for existing instances
+  - 🔔 Ready-to-use alerting rules for existing Prometheus alert managers
+
+### 🛠️ Configuration Improvements
+- **Fixed Prometheus Configuration**: Removed incorrect `params` section from prometheus.yml
+  - Eliminated unnecessary `format: ['prometheus']` parameter
+  - Streamlined scraping configuration for better reliability
+  - Improved compatibility with standard Prometheus setups
+
+### 📚 Enhanced Documentation
+- **Updated README.md**: Added "Option 0" for existing infrastructure integration
+  - Quick start guide for users with existing monitoring
+  - Clear separation between new deployments and integrations
+  - Improved user experience for different deployment scenarios
+- **Comprehensive Integration Guide**: Detailed troubleshooting for common integration issues
+  - Network connectivity solutions across Docker networks
+  - Dashboard data troubleshooting steps
+  - Container accessibility fixes for different setups
+
+### 🎯 User Experience Improvements
+- **Flexible Deployment Options**: Three clear monitoring paths
+  - Option 0: Integration with existing Prometheus/Grafana (minimal overhead)
+  - Option 1: Complete Prometheus stack (new deployments)
+  - Option 2: Complete InfluxDB stack (alternative approach)
+- **Professional Integration**: Follows monitoring best practices for multi-service environments
+
 ## [v25.0.33] - 2025-01-27
 
 ### 🧹 Repository Consolidation & Cleanup
