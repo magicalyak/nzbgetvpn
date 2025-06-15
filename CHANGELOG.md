@@ -2,6 +2,54 @@
 
 All notable changes to nzbgetvpn will be documented in this file.
 
+## [v25.0.38] - 2025-06-15
+
+### 🏠 Home Assistant Integration
+- **Complete Home Assistant Integration**: Production-ready monitoring dashboard
+  - ✅ **REST Sensors**: Comprehensive sensor configuration for health and status endpoints
+  - ✅ **Template Sensors**: Individual health checks and system metrics extraction
+  - ✅ **Binary Sensors**: True/false states for easy automation and alerting
+  - ✅ **Smart Notifications**: Automated alerts for health issues, VPN disconnections, IP leaks
+  - ✅ **Two Dashboard Options**: Simple (built-in cards) and Advanced (custom components)
+  - ✅ **Comprehensive Documentation**: Complete setup guide with troubleshooting
+
+### 🚀 Production Deployment Success
+- **Live Deployment Verification**: Successfully deployed and tested on rocky.gamull.com
+  - ✅ **Fixed psutil Dependencies**: Resolved Python module issues in production
+  - ✅ **Systemd Service Integration**: Proper integration with existing systemd service
+  - ✅ **All Endpoints Operational**: Health, status, metrics, and NZBGet web interface
+  - ✅ **Enhanced Monitoring Active**: All health checks operational and reporting
+
+### 📊 Real-Time Monitoring Features
+- **Professional Dashboard Components**: Beautiful, functional Home Assistant cards
+  - 🎨 **Color-Coded Status Indicators**: Visual health status with state-based coloring
+  - 📈 **Historical Graphs**: Health status trends over time
+  - 🔄 **Quick Action Buttons**: Direct access to metrics, NZBGet, and refresh functions
+  - 📱 **Mobile-Friendly Design**: Responsive layout for all devices
+  - ⚡ **Real-Time Updates**: 30-second health polling, 60-second status updates
+
+### 🔔 Intelligent Alerting System
+- **Smart Notification Logic**: Configurable alerts with false-positive prevention
+  - 🚨 **Health Alerts**: Container unhealthy state notifications (2-minute delay)
+  - 🔌 **VPN Disconnection Alerts**: Immediate VPN interface down notifications
+  - 🛡️ **IP Leak Detection**: Critical priority alerts for external IP changes
+  - 📧 **Multiple Notification Services**: Discord, Telegram, Mobile App support
+
+### 🌐 Live Production Endpoints
+- **Verified Working Endpoints**: All services operational on rocky.gamull.com
+  - **Health**: `http://rocky.gamull.com:8081/health` - Comprehensive health status
+  - **Status**: `http://rocky.gamull.com:8081/status` - Detailed system information  
+  - **Metrics**: `http://rocky.gamull.com:8081/metrics` - Performance metrics
+  - **NZBGet**: `http://rocky.gamull.com:6790` - NZBGet web interface
+
+### 📚 Enhanced Documentation
+- **Complete Home Assistant Guide**: Professional documentation with examples
+  - 🚀 **Quick Setup Guide**: Step-by-step configuration instructions
+  - 📊 **Sensor Reference**: Complete table of all available sensors and their values
+  - 🎨 **Dashboard Examples**: Multiple Lovelace card configurations
+  - 🔧 **Troubleshooting Section**: Common issues and solutions
+  - 🔗 **Integration Examples**: Discord, Telegram, Mobile App notifications
+
 ## [v25.0.37] - 2025-01-27
 
 ### 🔍 Comprehensive Health Check System
