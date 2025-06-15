@@ -2,6 +2,53 @@
 
 All notable changes to nzbgetvpn will be documented in this file.
 
+## [v25.0.36] - 2025-01-27
+
+### 🧹 Clean Docker Hub Release Strategy
+- **Simplified Tagging Strategy**: Complete overhaul of Docker Hub tagging for clean releases
+  - ✅ **Only Version Tags**: Removed all branch-based tags (main, main-xxxx) from Docker Hub
+  - ✅ **Release-Only Builds**: Only trigger builds on version tag pushes (v*)
+  - ✅ **Clean Tag Set**: v25.0.36, 25.0.36, v25.0, 25.0, v25, 25, latest, stable
+  - ❌ **No Development Tags**: No more clutter with SHA-based or branch tags
+  - 🎯 **Predictable Releases**: Users get consistent, clean version tags
+
+### 🔧 GitHub Actions Workflow Improvements
+- **Fixed "Invalid Reference Format" Errors**: Comprehensive workflow debugging and fixes
+  - Enhanced conditional expressions in docker/metadata-action tags
+  - Added explicit event_name checks for all tag types
+  - Comprehensive tag validation to catch invalid references early
+  - Safety checks for JSON parsing in manifest creation steps
+  - Improved error handling and debugging output for troubleshooting
+
+### 🚀 Workflow Optimization
+- **Streamlined Build Process**: Simplified workflow for better reliability
+  - Removed unnecessary credential validation steps
+  - Eliminated complex conditional logic that caused issues
+  - Focused workflow on release builds only
+  - Removed scheduled builds and PR builds for Docker Hub
+  - Maintained GHCR support for development if needed
+
+### 📋 Simple Version Tag Workflow
+- **Backup Tagging System**: Added simple-version-tags.yml workflow
+  - Ensures version tags are always created even if main workflow has issues
+  - Waits for main build completion then creates version tags
+  - Provides redundancy for critical version tag creation
+  - Manual fallback for version tag generation
+
+### 🎯 User Experience Improvements
+- **Cleaner Docker Hub Repository**: Professional appearance with only release versions
+- **Faster Builds**: No unnecessary builds on development commits
+- **Predictable Tagging**: Clear, consistent version tag patterns
+- **Better Documentation**: Updated integration guides for existing monitoring setups
+
+### 🔗 Enhanced Monitoring Integration
+- **Existing Infrastructure Support**: Comprehensive guides for integrating with existing setups
+  - Step-by-step Prometheus configuration for adding nzbgetvpn metrics
+  - Container discovery commands for different Docker environments
+  - Grafana dashboard import process for existing instances
+  - Ready-to-use alerting rules for existing Prometheus setups
+  - Network connectivity troubleshooting across Docker networks
+
 ## [v25.0.34] - 2025-01-27
 
 ### 🔗 Monitoring Integration Enhancements

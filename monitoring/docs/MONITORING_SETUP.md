@@ -7,7 +7,7 @@ This guide explains how to set up comprehensive monitoring for your nzbgetvpn co
 Your nzbgetvpn container exposes the following monitoring endpoints on port 8080:
 
 - `/health` - Current health status (JSON)
-- `/metrics` - Historical metrics and summary (JSON)  
+- `/metrics` - Historical metrics and summary (JSON)
 - `/status` - Detailed system status (JSON)
 - `/logs` - Recent log entries (JSON)
 - `/prometheus` - Prometheus-compatible metrics (text)
@@ -395,7 +395,7 @@ groups:
           summary: "nzbgetvpn container is unhealthy"
           description: "Container has been unhealthy for more than 2 minutes"
 
-      - alert: VPNDisconnected  
+      - alert: VPNDisconnected
         expr: nzbgetvpn_check{check="vpn_interface"} == 0
         for: 1m
         labels:
@@ -403,7 +403,7 @@ groups:
         annotations:
           summary: "VPN connection lost"
           description: "VPN interface check is failing"
-          
+
       - alert: HighResponseTime
         expr: nzbgetvpn_response_time_seconds{stat="average"} > 5
         for: 5m
