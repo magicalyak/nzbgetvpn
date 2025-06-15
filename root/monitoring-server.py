@@ -20,6 +20,8 @@ from urllib.parse import urlparse, parse_qs
 import threading
 import subprocess
 import logging
+import psutil
+import socket
 
 # Configuration
 MONITORING_PORT = int(os.environ.get('MONITORING_PORT', '8080'))
@@ -27,6 +29,10 @@ METRICS_FILE = '/config/metrics.json'
 HEALTHCHECK_LOG = '/config/healthcheck.log'
 STATUS_FILE = '/tmp/nzbgetvpn_status.json'
 LOG_LEVEL = os.environ.get('MONITORING_LOG_LEVEL', 'INFO')
+ENABLE_SYSTEM_METRICS = os.environ.get('ENABLE_SYSTEM_METRICS', 'true').lower() == 'true'
+HEALTH_CHECK_HOST = os.environ.get('HEALTH_CHECK_HOST', 'google.com')
+CHECK_DNS_LEAK = os.environ.get('CHECK_DNS_LEAK', 'false').lower() == 'true'
+CHECK_IP_LEAK = os.environ.get('CHECK_IP_LEAK', 'false').lower() == 'true'
 
 # Setup logging
 logging.basicConfig(

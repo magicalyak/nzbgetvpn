@@ -2,38 +2,96 @@
 
 This guide explains how to set up comprehensive monitoring for your nzbgetvpn container using either Prometheus or InfluxDB2 with beautiful, functional Grafana dashboards.
 
-## 🎯 Available Metrics & Endpoints
+## 🎯 Enhanced Monitoring & Health Checks
+
+Your nzbgetvpn container now includes **comprehensive health checking** similar to transmissionvpn, with multiple configurable checks and detailed monitoring.
+
+### **Monitoring Endpoints**
 
 Your nzbgetvpn container exposes the following monitoring endpoints on port 8080:
 
-- `/health` - Current health status (JSON)
-- `/metrics` - Historical metrics and summary (JSON)
-- `/status` - Detailed system status (JSON)
-- `/logs` - Recent log entries (JSON)
-- `/prometheus` - Prometheus-compatible metrics (text)
+- `/health` - Current health status with detailed check results (JSON)
+- `/metrics` - Historical metrics and performance summary (JSON)
+- `/status` - Detailed system status with configuration info (JSON)
+- `/logs` - Recent log entries with filtering options (JSON)
+- `/prometheus` - Prometheus-compatible metrics (text format)
 
-## 📊 Comprehensive Metrics Collected
+### **🔍 Comprehensive Health Checks**
 
-### Health & Status Metrics
-- **Overall Health**: Container health status (healthy/unhealthy/degraded/warning)
-- **Individual Checks**: NZBGet connectivity, VPN status, DNS resolution, IP leak detection
-- **Response Times**: Average and maximum response times for each check type
-- **Success Rates**: Percentage of successful checks for each check type
+The enhanced health check system monitors multiple aspects of your container:
 
-### System Metrics
-- **Memory Usage**: Usage percentage and available memory
-- **CPU Usage**: Current CPU utilization percentage  
-- **Load Average**: System load (1, 5, 15 minute averages)
-- **Container Uptime**: How long the container has been running
+#### **Core Application Checks**
+- ✅ **NZBGet Responsiveness** - Web interface + JSON-RPC API validation
+- ✅ **VPN Interface Status** - Detection and monitoring of tun0/wg0 interfaces
+- ✅ **VPN Connectivity** - Active network testing through VPN tunnel
+- ✅ **DNS Resolution** - Prevents DNS failures and ensures proper routing
 
-### Network & VPN Metrics
-- **External IP Address**: Current external IP (should be VPN IP)
-- **VPN Interface Status**: Status of tun0/wg0 interfaces
-- **IP Leak Detection**: Monitoring for IP leaks outside VPN
+#### **Security & Leak Detection**
+- 🔐 **IP Leak Detection** - Monitors external IP changes (configurable)
+- 🔐 **DNS Leak Detection** - Tracks DNS server changes (configurable)
+- 🔐 **News Server Connectivity** - Validates Usenet server access
+- 🔐 **Network Routing** - Ensures traffic flows through VPN
 
-### Application Metrics
-- **NZBGet Status**: Connectivity and responsiveness to NZBGet
-- **Download Statistics**: Available through NZBGet API integration
+#### **System Resource Monitoring**
+- 📊 **Memory Usage** - Real-time memory consumption and availability
+- 📊 **CPU Usage** - CPU utilization percentage with load averages
+- 📊 **Disk Usage** - Storage usage for important paths (/config, /downloads)
+- 📊 **Network Statistics** - Interface statistics and throughput metrics
+
+### **📊 Detailed Metrics Collection**
+
+#### **Health Check Metrics**
+- **Response Times**: Millisecond-accurate timing for all health checks
+- **Success Rates**: Historical success/failure rates for each check type
+- **Status Transitions**: Track when health status changes occur
+- **Check Configuration**: Which checks are enabled/disabled
+
+#### **Performance Metrics**
+- **System Resources**: CPU, memory, disk, and network utilization
+- **VPN Performance**: Interface statistics, throughput, connection stability
+- **Application Performance**: NZBGet response times and API health
+- **Network Performance**: DNS resolution times, external connectivity
+
+#### **Security Metrics**
+- **IP Tracking**: Current and historical external IP addresses
+- **DNS Monitoring**: DNS server usage and potential leak detection
+- **Connection Integrity**: VPN tunnel status and routing validation
+- **Leak Detection**: Automated detection of IP/DNS leaks with alerting
+
+## 🔧 **Health Check Configuration**
+
+All health checks are configurable via environment variables:
+
+### **Basic Configuration**
+```bash
+# Enable comprehensive monitoring
+METRICS_ENABLED=true
+DEBUG=true
+
+# Core health check settings
+HEALTH_CHECK_HOST=google.com          # Host for connectivity tests
+HEALTH_CHECK_TIMEOUT=10               # Timeout for health operations
+EXTERNAL_IP_SERVICE=ifconfig.me       # Service for IP detection
+```
+
+### **Security-Focused Configuration**
+```bash
+# Enable all security checks
+CHECK_DNS_LEAK=true                   # Monitor DNS server changes
+CHECK_IP_LEAK=true                    # Monitor external IP changes
+CHECK_VPN_CONNECTIVITY=true           # Test VPN tunnel connectivity
+CHECK_NEWS_SERVER=true                # Test Usenet server access
+```
+
+### **Customization Options**
+```bash
+# Customize check behavior
+HEALTH_CHECK_HOST=cloudflare.com      # Use different connectivity test host
+EXTERNAL_IP_SERVICE=icanhazip.com     # Use different IP detection service
+HEALTH_CHECK_TIMEOUT=15               # Increase timeout for slow networks
+```
+
+See **[HEALTHCHECK_OPTIONS.md](../../HEALTHCHECK_OPTIONS.md)** for complete configuration guide.
 
 ## 🔗 Option 0: Integration with Existing Prometheus & Grafana
 

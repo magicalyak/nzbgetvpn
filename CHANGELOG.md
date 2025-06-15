@@ -2,6 +2,61 @@
 
 All notable changes to nzbgetvpn will be documented in this file.
 
+## [v25.0.37] - 2025-01-27
+
+### 🔍 Comprehensive Health Check System
+- **Enhanced Health Monitoring**: Complete overhaul based on transmissionvpn approach
+  - ✅ **Configurable IP leak detection** with external IP monitoring and change tracking
+  - ✅ **DNS leak detection** with DNS server change monitoring and alerts
+  - ✅ **VPN connectivity testing** with actual network validation through VPN tunnel
+  - ✅ **News server connectivity** validation for Usenet server access
+  - ✅ **Enhanced NZBGet monitoring** with JSON-RPC API validation
+  - ✅ **System resource monitoring** with CPU, memory, disk, and network metrics
+
+### ⚙️ Advanced Health Check Configuration
+- **Environment Variable Control**: Complete customization of all health checks
+  - `CHECK_DNS_LEAK=true/false` - Monitor DNS server changes
+  - `CHECK_IP_LEAK=true/false` - Monitor external IP changes  
+  - `CHECK_VPN_CONNECTIVITY=true/false` - Test VPN tunnel connectivity
+  - `CHECK_NEWS_SERVER=true/false` - Test Usenet server access
+  - `HEALTH_CHECK_HOST=google.com` - Configurable connectivity test host
+  - `HEALTH_CHECK_TIMEOUT=10` - Configurable timeout for operations
+  - `EXTERNAL_IP_SERVICE=ifconfig.me` - Configurable IP detection service
+  - `METRICS_ENABLED=true/false` - Enable detailed metrics collection
+
+### 📊 Enhanced Health Status System
+- **Multiple Health Status Levels**: Intelligent health classification
+  - **healthy** (green) - All checks passed
+  - **warning** (yellow) - Non-critical issues (news server, IP changes)
+  - **degraded** (orange) - Important issues (DNS, VPN connectivity)
+  - **unhealthy** (red) - Critical issues (NZBGet down, VPN interface down)
+- **Detailed Exit Codes**: Specific exit codes for different failure scenarios (0-8)
+- **Comprehensive Status File**: JSON status with configuration and check details
+
+### 🛡️ Security & Leak Detection
+- **IP Leak Monitoring**: Track external IP changes to detect VPN disconnections
+- **DNS Leak Detection**: Monitor DNS server changes to prevent DNS leaks
+- **VPN Tunnel Validation**: Active network testing through VPN interface
+- **Historical Tracking**: Store previous IPs and DNS servers for comparison
+
+### 📖 Comprehensive Documentation
+- **New HEALTHCHECK_OPTIONS.md**: Complete configuration guide with examples
+  - Quick setup examples for different use cases
+  - Detailed configuration tables and options
+  - Health status level explanations
+  - Testing and troubleshooting guides
+  - Security considerations and best practices
+- **Enhanced README.md**: New health check section with configuration examples
+- **Updated Monitoring Documentation**: Integration of health check features
+
+### 🔧 Technical Improvements
+- **Smart VPN Interface Detection**: Auto-detection of tun0/wg0 interfaces
+- **Improved Error Handling**: Better logging and error recovery throughout
+- **Enhanced Metrics Collection**: Response times, success rates, and system metrics
+- **Fixed Logging Issues**: Prevented debug output from interfering with function returns
+- **Multiple IP Service Fallbacks**: Redundant external IP detection services
+- **Enhanced Timeout Handling**: Configurable timeouts for all network operations
+
 ## [v25.0.36] - 2025-01-27
 
 ### 🧹 Clean Docker Hub Release Strategy

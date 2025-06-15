@@ -409,6 +409,64 @@ services:
 
 **👉 Complete monitoring guide:** [monitoring/docs/MONITORING_SETUP.md](monitoring/docs/MONITORING_SETUP.md)
 
+## 🔍 Enhanced Health Checks
+
+nzbgetvpn includes **comprehensive health monitoring** similar to transmissionvpn with configurable security checks:
+
+### **Core Application Monitoring**
+- ✅ **NZBGet responsiveness** - Web interface + JSON-RPC API validation
+- ✅ **VPN interface status** - Automated detection of tun0/wg0 interfaces  
+- ✅ **VPN connectivity** - Active network testing through VPN tunnel
+- ✅ **DNS resolution** - Prevents DNS failures and routing issues
+
+### **Security & Leak Detection**
+- 🔐 **IP leak detection** - Monitors external IP changes
+- 🔐 **DNS leak detection** - Tracks DNS server changes
+- 🔐 **News server connectivity** - Validates Usenet server access
+- 🔐 **Network routing** - Ensures traffic flows through VPN
+
+### **Health Check Configuration**
+
+```yaml
+environment:
+  # Enable comprehensive monitoring
+  - METRICS_ENABLED=true
+  - DEBUG=true
+  
+  # Security-focused monitoring
+  - CHECK_DNS_LEAK=true
+  - CHECK_IP_LEAK=true
+  - CHECK_VPN_CONNECTIVITY=true
+  - CHECK_NEWS_SERVER=true
+  
+  # Customize check behavior
+  - HEALTH_CHECK_HOST=cloudflare.com
+  - HEALTH_CHECK_TIMEOUT=15
+  - EXTERNAL_IP_SERVICE=icanhazip.com
+```
+
+### **Health Status Levels**
+- **healthy** (green) - All checks passed
+- **warning** (yellow) - Non-critical issues (news server, IP changes)
+- **degraded** (orange) - Important issues (DNS, VPN connectivity)  
+- **unhealthy** (red) - Critical issues (NZBGet down, VPN interface down)
+
+### **Testing Health Checks**
+
+```bash
+# Run health check manually
+docker exec nzbgetvpn /root/healthcheck.sh
+echo "Exit code: $?"
+
+# View detailed health status
+docker exec nzbgetvpn cat /tmp/nzbgetvpn_status.json | jq '.'
+
+# Monitor health logs in real-time
+docker exec nzbgetvpn tail -f /config/healthcheck.log
+```
+
+**👉 Complete configuration guide:** [HEALTHCHECK_OPTIONS.md](HEALTHCHECK_OPTIONS.md)
+
 ## 🔧 Enhanced Monitoring & Auto-Restart
 
 Enable advanced monitoring and automatic service recovery:
