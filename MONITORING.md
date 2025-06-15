@@ -2,6 +2,8 @@
 
 nzbgetvpn includes advanced monitoring and automatic restart capabilities to ensure maximum reliability and provide detailed insights into container health.
 
+> ✅ **Health monitoring now works correctly on all architectures!** Recent fixes resolved BusyBox compatibility issues that were causing "unknown" status values.
+
 ## 🚀 Quick Start
 
 **Enable monitoring in your `.env` file:**

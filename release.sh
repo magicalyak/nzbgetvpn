@@ -2,7 +2,7 @@
 set -e
 
 # Configuration
-VERSION="v25.0.25"
+VERSION="v25.0.29"
 IMAGE_NAME="magicalyak/nzbgetvpn"
 BRANCH="main"
 

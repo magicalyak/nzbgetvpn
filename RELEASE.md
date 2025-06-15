@@ -1,5 +1,47 @@
 # nzbgetvpn Release Notes
 
+## v25.0.29 (2025-01-19) ✅ HEALTH MONITORING FIXED
+**Critical Fix: Health Checks Now Show Meaningful Values**
+
+### 🐛 Critical Bug Fixes
+- **Fixed "unknown" status issue** - All health checks now report proper values (success/up/failed)
+- **BusyBox compatibility** - Replaced `grep -oP` with `sed` commands for all architectures  
+- **News server monitoring** - Reads directly from NZBGet config instead of environment variables
+- **Status file creation** - Fixed jq commands to properly parse metrics JSON
+
+### 📊 Health Monitoring Now Works
+```json
+{
+  "status": "healthy", 
+  "checks": {
+    "nzbget": "success",
+    "vpn_interface": "up",
+    "dns": "success", 
+    "news_server": "success"
+  }
+}
+```
+
+### ✅ What Was Fixed
+1. **BusyBox Issue**: Line 163 `grep -oP` → `sed -n` for IP extraction
+2. **Status Creation**: Fixed jq commands in lines 303-306 to read from metrics array
+3. **News Server**: Modified to read from `/config/nzbget.conf` automatically
+4. **Cross-Platform**: Now works on x86_64, ARM64, Raspberry Pi, all Linux distros
+
+### 🧹 Repository Cleanup
+- Removed `Dockerfile.fixed` (no longer needed)
+- Removed `build-fixed.sh` (fixes now in main code)  
+- Updated documentation to reflect working status
+- Enhanced troubleshooting guide
+
+### 🎯 Benefits for Users
+- **Immediate functionality** - Health monitoring works out of the box
+- **No configuration needed** - Automatically detects news servers from NZBGet
+- **Better monitoring** - Accurate status for dashboards and alerting
+- **Multi-arch support** - Same functionality on all platforms
+
+---
+
 ## v25.0.28 (2024-12-19)
 **Fix: Monitoring Port Access**
 

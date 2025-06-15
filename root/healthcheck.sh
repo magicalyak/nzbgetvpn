@@ -160,7 +160,7 @@ check_vpn_interface() {
         # Additional checks for interface statistics
         local rx_bytes=$(cat "/sys/class/net/$vpn_if/statistics/rx_bytes" 2>/dev/null || echo "0")
         local tx_bytes=$(cat "/sys/class/net/$vpn_if/statistics/tx_bytes" 2>/dev/null || echo "0")
-        local ip_addr=$(ip addr show "$vpn_if" | grep -oP 'inet \K[^/]+' | head -1 || echo "unknown")
+        local ip_addr=$(ip addr show "$vpn_if" | sed -n "s/.*inet \([0-9.]*\).*/\1/p" | head -1 || echo "unknown")
         
         local end_time=$(date +%s.%N)
         local response_time=$(echo "$end_time - $start_time" | bc 2>/dev/null || echo "0")
@@ -218,8 +218,9 @@ fi
 
 # Function to check news server connectivity (optional)
 check_news_server() {
-    local news_host="${NZBGET_S1_HOST:-}"
-    local news_port="${NZBGET_S1_PORT:-563}"
+    # Read from NZBGet config file instead of environment variables
+    local news_host=$(grep "^Server1.Host=" /config/nzbget.conf 2>/dev/null | cut -d= -f2 || echo "")
+    local news_port=$(grep "^Server1.Port=" /config/nzbget.conf 2>/dev/null | cut -d= -f2 || echo "563")
     
     if [[ -z "$news_host" ]]; then
         log "INFO" "No news server configured for health check"
@@ -302,10 +303,10 @@ main() {
     "vpn_interface": "${vpn_interface:-unknown}",
     "external_ip": "$(get_external_ip 2>/dev/null || echo 'unknown')",
     "checks": {
-        "nzbget": "$(grep '"check":"nzbget"' "$METRICS_FILE" 2>/dev/null | tail -1 | jq -r '.status' 2>/dev/null || echo 'unknown')",
-        "vpn_interface": "$(grep '"check":"vpn_interface"' "$METRICS_FILE" 2>/dev/null | tail -1 | jq -r '.status' 2>/dev/null || echo 'unknown')",
-        "dns": "$(grep '"check":"dns"' "$METRICS_FILE" 2>/dev/null | tail -1 | jq -r '.status' 2>/dev/null || echo 'unknown')",
-        "news_server": "$(grep '"check":"news_server"' "$METRICS_FILE" 2>/dev/null | tail -1 | jq -r '.status' 2>/dev/null || echo 'unknown')"
+        "nzbget": "$(jq -r '.[] | select(.check=="nzbget") | .status' "$METRICS_FILE" 2>/dev/null | tail -1 || echo 'unknown')",
+        "vpn_interface": "$(jq -r '.[] | select(.check=="vpn_interface") | .status' "$METRICS_FILE" 2>/dev/null | tail -1 || echo 'unknown')",
+        "dns": "$(jq -r '.[] | select(.check=="dns") | .status' "$METRICS_FILE" 2>/dev/null | tail -1 || echo 'unknown')",
+        "news_server": "$(jq -r '.[] | select(.check=="news_server") | .status' "$METRICS_FILE" 2>/dev/null | tail -1 || echo 'unknown')"
     }
 }
 EOF

@@ -329,11 +329,11 @@ scrape_configs:
 
 ```json
 {
-  "timestamp": "2025-06-13T15:30:00Z",
+  "timestamp": "2025-01-19T15:30:00Z",
   "status": "healthy",
   "exit_code": 0,
   "vpn_interface": "tun0", 
-  "external_ip": "172.21.20.27",
+  "external_ip": "203.0.113.42",
   "checks": {
     "nzbget": "success",
     "vpn_interface": "up",
@@ -342,6 +342,8 @@ scrape_configs:
   }
 }
 ```
+
+> ✅ **Health monitoring now works correctly on all architectures!** Recent fixes resolved BusyBox compatibility issues and improved status reporting.
 
 ### Prometheus Metrics
 

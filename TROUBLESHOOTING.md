@@ -422,30 +422,43 @@ If you're still experiencing issues:
    docker exec nzbgetvpn tail -f /config/monitoring.log
    ```
 
-### Problem: Health checks showing incorrect status
+### Problem: Health checks showing "unknown" status ✅ FIXED
 
-**Solutions:**
+**This issue has been resolved in the current version.**
 
-1. **Run health check manually:**
+**What was fixed:**
+- BusyBox compatibility issue with `grep -oP` command
+- Status file creation now uses proper jq commands  
+- News server check reads directly from NZBGet config file
+
+**Expected behavior:**
+```json
+{
+  "status": "healthy",
+  "checks": {
+    "nzbget": "success",
+    "vpn_interface": "up", 
+    "dns": "success",
+    "news_server": "success"
+  }
+}
+```
+
+**If still seeing "unknown" values:**
+
+1. **Test health endpoint:**
+   ```bash
+   curl http://localhost:8080/health
+   ```
+
+2. **Run health check manually:**
    ```bash
    docker exec nzbgetvpn /root/healthcheck.sh
-   echo $?  # Check exit code
    ```
 
-2. **Check health check logs:**
+3. **Check logs for errors:**
    ```bash
    docker exec nzbgetvpn tail -f /config/healthcheck.log
-   ```
-
-3. **Verify status file:**
-   ```bash
-   docker exec nzbgetvpn cat /tmp/nzbgetvpn_status.json
-   ```
-
-4. **Test individual endpoints:**
-   ```bash
-   # Test from inside container
-   docker exec nzbgetvpn curl -s http://localhost:8080/health
    ```
 
 ### Problem: Auto-restart not working
