@@ -12,7 +12,7 @@
       }
     ]
   },
-  "description": "Comprehensive monitoring dashboard for nzbgetvpn container with health checks, VPN status, system metrics, and download statistics",
+  "description": "Comprehensive InfluxDB-based monitoring dashboard for nzbgetvpn container with health checks, VPN status, system metrics, and historical data",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "gnetId": null,
@@ -30,13 +30,25 @@
       "tooltip": "Direct access to monitoring endpoints",
       "type": "link",
       "url": "http://localhost:8080"
+    },
+    {
+      "asDropdown": false,
+      "icon": "doc",
+      "includeVars": false,
+      "keepTime": false,
+      "tags": [],
+      "targetBlank": true,
+      "title": "InfluxDB UI",
+      "tooltip": "Access InfluxDB management interface",
+      "type": "link",
+      "url": "http://localhost:8086"
     }
   ],
   "liveNow": false,
   "panels": [
     {
-      "datasource": "Prometheus",
-      "description": "Overall health status of the nzbgetvpn container. Green = Healthy, Red = Unhealthy",
+      "datasource": "InfluxDB",
+      "description": "Overall health status from health endpoint",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -45,15 +57,25 @@
           "mappings": [
             {
               "options": {
-                "0": {
-                  "color": "red",
+                "degraded": {
+                  "color": "orange",
+                  "index": 1,
+                  "text": "DEGRADED"
+                },
+                "healthy": {
+                  "color": "green",
                   "index": 0,
+                  "text": "HEALTHY"
+                },
+                "unhealthy": {
+                  "color": "red",
+                  "index": 2,
                   "text": "UNHEALTHY"
                 },
-                "1": {
-                  "color": "green",
-                  "index": 1,
-                  "text": "HEALTHY"
+                "warning": {
+                  "color": "yellow",
+                  "index": 3,
+                  "text": "WARNING"
                 }
               },
               "type": "value"
@@ -63,22 +85,17 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
-                "value": null
-              },
-              {
                 "color": "green",
-                "value": 1
+                "value": null
               }
             ]
-          },
-          "unit": "none"
+          }
         },
         "overrides": []
       },
       "gridPos": {
         "h": 4,
-        "w": 4,
+        "w": 6,
         "x": 0,
         "y": 0
       },
@@ -100,120 +117,21 @@
       "pluginVersion": "8.5.0",
       "targets": [
         {
-          "datasource": "Prometheus",
-          "expr": "nzbgetvpn_health_check",
-          "interval": "",
-          "legendFormat": "",
+          "datasource": "InfluxDB",
+          "query": "from(bucket: \"metrics\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"nzbgetvpn_health_status\")\n  |> filter(fn: (r) => r[\"_field\"] == \"status\")\n  |> last()\n  |> yield(name: \"last\")",
           "refId": "A"
         }
       ],
-      "title": "Overall Health",
+      "title": "Health Status",
       "type": "stat"
     },
     {
-      "datasource": "Prometheus",
-      "description": "Current status of individual health checks",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "custom": {
-            "align": "center",
-            "displayMode": "color-background",
-            "inspect": false
-          },
-          "mappings": [
-            {
-              "options": {
-                "0": {
-                  "color": "red",
-                  "index": 0,
-                  "text": "FAIL"
-                },
-                "1": {
-                  "color": "green",
-                  "index": 1,
-                  "text": "OK"
-                }
-              },
-              "type": "value"
-            }
-          ],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 8,
-        "x": 4,
-        "y": 0
-      },
-      "id": 2,
-      "options": {
-        "showHeader": true
-      },
-      "pluginVersion": "8.5.0",
-      "targets": [
-        {
-          "datasource": "Prometheus",
-          "expr": "nzbgetvpn_check",
-          "format": "table",
-          "instant": true,
-          "interval": "",
-          "legendFormat": "",
-          "refId": "A"
-        }
-      ],
-      "title": "Health Check Status",
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "Value": true,
-              "__name__": true,
-              "instance": true,
-              "job": true
-            },
-            "indexByName": {},
-            "renameByName": {
-              "Status": "Status",
-              "Check Type": "Check Type"
-            }
-          }
-        }
-      ],
-      "type": "table"
-    },
-    {
-      "datasource": "Prometheus",
-      "description": "Container uptime and current timestamp",
+      "datasource": "InfluxDB",
+      "description": "Container uptime in human readable format",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "palette-classic"
-          },
-          "custom": {
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "vis": false
-            }
           },
           "mappings": [],
           "unit": "s"
@@ -222,11 +140,11 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 12,
+        "w": 6,
+        "x": 6,
         "y": 0
       },
-      "id": 15,
+      "id": 2,
       "options": {
         "colorMode": "value",
         "graphMode": "area",
@@ -244,10 +162,8 @@
       "pluginVersion": "8.5.0",
       "targets": [
         {
-          "datasource": "Prometheus",
-          "expr": "time() - nzbgetvpn_start_time",
-          "interval": "",
-          "legendFormat": "Uptime",
+          "datasource": "InfluxDB",
+          "query": "from(bucket: \"metrics\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"nzbgetvpn_system\")\n  |> filter(fn: (r) => r[\"_field\"] == \"uptime_seconds\")\n  |> last()\n  |> yield(name: \"uptime\")",
           "refId": "A"
         }
       ],
@@ -255,17 +171,12 @@
       "type": "stat"
     },
     {
-      "datasource": "Prometheus",
-      "description": "External IP address as seen by the container (should be VPN IP)",
+      "datasource": "InfluxDB",
+      "description": "Current external IP address (should be VPN IP)",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "thresholds"
-          },
-          "custom": {
-            "align": "center",
-            "displayMode": "color-text",
-            "inspect": false
           },
           "mappings": [],
           "thresholds": {
@@ -282,11 +193,11 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 8,
-        "x": 16,
+        "w": 6,
+        "x": 12,
         "y": 0
       },
-      "id": 16,
+      "id": 3,
       "options": {
         "colorMode": "background",
         "graphMode": "none",
@@ -304,39 +215,62 @@
       "pluginVersion": "8.5.0",
       "targets": [
         {
-          "datasource": "Prometheus",
-          "expr": "nzbgetvpn_external_ip_info",
-          "format": "table",
-          "instant": true,
-          "interval": "",
-          "legendFormat": "",
+          "datasource": "InfluxDB",
+          "query": "from(bucket: \"metrics\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"nzbgetvpn_system\")\n  |> filter(fn: (r) => r[\"_field\"] == \"external_ip\")\n  |> last()\n  |> yield(name: \"ip\")",
           "refId": "A"
         }
       ],
-      "title": "Current External IP (VPN)",
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "Value": true,
-              "__name__": true,
-              "instance": true,
-              "job": true
-            },
-            "indexByName": {},
-            "renameByName": {
-              "ip": "IP Address"
-            }
-          }
-        }
-      ],
-      "type": "table"
+      "title": "External IP (VPN)",
+      "type": "stat"
     },
     {
-      "datasource": "Prometheus",
-      "description": "Historical view of health status over time",
+      "datasource": "InfluxDB",
+      "description": "Response time statistics for all health checks",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "mean"
+          ],
+          "fields": ""
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "8.5.0",
+      "targets": [
+        {
+          "datasource": "InfluxDB",
+          "query": "from(bucket: \"metrics\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"nzbgetvpn_summary\")\n  |> filter(fn: (r) => r[\"_field\"] == \"avg_response_time\")\n  |> mean()\n  |> yield(name: \"avg_response\")",
+          "refId": "A"
+        }
+      ],
+      "title": "Avg Response Time",
+      "type": "stat"
+    },
+    {
+      "datasource": "InfluxDB",
+      "description": "Health status over time with color coding",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -355,7 +289,7 @@
               "vis": false
             },
             "lineInterpolation": "stepAfter",
-            "lineWidth": 2,
+            "lineWidth": 3,
             "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
@@ -373,54 +307,41 @@
           "mappings": [
             {
               "options": {
-                "0": {
-                  "color": "red",
+                "degraded": {
+                  "color": "orange",
+                  "index": 1,
+                  "text": "Degraded"
+                },
+                "healthy": {
+                  "color": "green",
                   "index": 0,
+                  "text": "Healthy"
+                },
+                "unhealthy": {
+                  "color": "red",
+                  "index": 2,
                   "text": "Unhealthy"
                 },
-                "1": {
-                  "color": "green",
-                  "index": 1,
-                  "text": "Healthy"
+                "warning": {
+                  "color": "yellow",
+                  "index": 3,
+                  "text": "Warning"
                 }
               },
               "type": "value"
             }
           ],
-          "max": 1.1,
-          "min": -0.1,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "red",
-                "value": 0.5
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Overall Health"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "green",
-                  "mode": "fixed"
-                }
               }
             ]
           }
-        ]
+        },
+        "overrides": []
       },
       "gridPos": {
         "h": 8,
@@ -428,7 +349,7 @@
         "x": 0,
         "y": 4
       },
-      "id": 3,
+      "id": 5,
       "options": {
         "legend": {
           "calcs": [],
@@ -442,10 +363,8 @@
       },
       "targets": [
         {
-          "datasource": "Prometheus",
-          "expr": "nzbgetvpn_health_check",
-          "interval": "",
-          "legendFormat": "Overall Health",
+          "datasource": "InfluxDB",
+          "query": "from(bucket: \"metrics\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"nzbgetvpn_health_status\")\n  |> filter(fn: (r) => r[\"_field\"] == \"status\")\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\n  |> yield(name: \"health_over_time\")",
           "refId": "A"
         }
       ],
@@ -453,8 +372,8 @@
       "type": "timeseries"
     },
     {
-      "datasource": "Prometheus",
-      "description": "Individual health check status over time",
+      "datasource": "InfluxDB",
+      "description": "System resource usage metrics",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -472,7 +391,7 @@
               "tooltip": false,
               "vis": false
             },
-            "lineInterpolation": "stepAfter",
+            "lineInterpolation": "linear",
             "lineWidth": 2,
             "pointSize": 5,
             "scaleDistribution": {
@@ -485,28 +404,10 @@
               "mode": "none"
             },
             "thresholdsStyle": {
-              "mode": "off"
+              "mode": "line"
             }
           },
-          "mappings": [
-            {
-              "options": {
-                "0": {
-                  "color": "red",
-                  "index": 0,
-                  "text": "Failed"
-                },
-                "1": {
-                  "color": "green",
-                  "index": 1,
-                  "text": "Success"
-                }
-              },
-              "type": "value"
-            }
-          ],
-          "max": 1.1,
-          "min": -0.1,
+          "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -515,14 +416,31 @@
                 "value": null
               },
               {
+                "color": "yellow",
+                "value": 70
+              },
+              {
                 "color": "red",
-                "value": 0.5
+                "value": 90
               }
             ]
           },
-          "unit": "short"
+          "unit": "percent"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Load Average"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 8,
@@ -530,7 +448,7 @@
         "x": 12,
         "y": 4
       },
-      "id": 4,
+      "id": 6,
       "options": {
         "legend": {
           "calcs": [],
@@ -544,19 +462,110 @@
       },
       "targets": [
         {
-          "datasource": "Prometheus",
-          "expr": "nzbgetvpn_check",
-          "interval": "",
-          "legendFormat": "{{check}}",
+          "datasource": "InfluxDB",
+          "query": "from(bucket: \"metrics\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"nzbgetvpn_system\")\n  |> filter(fn: (r) => r[\"_field\"] == \"memory_usage_percent\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> yield(name: \"memory\")",
           "refId": "A"
+        },
+        {
+          "datasource": "InfluxDB",
+          "query": "from(bucket: \"metrics\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"nzbgetvpn_system\")\n  |> filter(fn: (r) => r[\"_field\"] == \"load_average_1min\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> yield(name: \"load\")",
+          "refId": "B"
         }
       ],
-      "title": "Individual Check Status",
+      "title": "System Resources",
       "type": "timeseries"
     },
     {
-      "datasource": "Prometheus",
-      "description": "Response times for health checks in seconds",
+      "datasource": "InfluxDB",
+      "description": "Success rates by check type",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "vis": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 90
+              },
+              {
+                "color": "green",
+                "value": 95
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 12
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": "InfluxDB",
+          "query": "from(bucket: \"metrics\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"nzbgetvpn_summary\")\n  |> filter(fn: (r) => r[\"_field\"] == \"success_rate\")\n  |> group(columns: [\"check_type\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> yield(name: \"success_rates\")",
+          "refId": "A"
+        }
+      ],
+      "title": "Success Rates by Check Type",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "InfluxDB",
+      "description": "Response times for different health check types",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -615,100 +624,10 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
-        "y": 12
-      },
-      "id": 5,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "datasource": "Prometheus",
-          "expr": "nzbgetvpn_response_time_seconds",
-          "interval": "",
-          "legendFormat": "{{check}} - {{stat}}",
-          "refId": "A"
-        }
-      ],
-      "title": "Response Times",
-      "type": "timeseries"
-    },
-    {
-      "datasource": "Prometheus",
-      "description": "Success rate percentage for each health check type",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "vis": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "line"
-            }
-          },
-          "mappings": [],
-          "max": 100,
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 90
-              },
-              {
-                "color": "green",
-                "value": 95
-              }
-            ]
-          },
-          "unit": "percent"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
         "x": 12,
         "y": 12
       },
-      "id": 6,
+      "id": 8,
       "options": {
         "legend": {
           "calcs": [],
@@ -716,57 +635,32 @@
           "placement": "bottom"
         },
         "tooltip": {
-          "mode": "single",
+          "mode": "multi",
           "sort": "none"
         }
       },
       "targets": [
         {
-          "datasource": "Prometheus",
-          "expr": "nzbgetvpn_success_rate_percent",
-          "interval": "",
-          "legendFormat": "{{check}} Success Rate",
+          "datasource": "InfluxDB",
+          "query": "from(bucket: \"metrics\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"nzbgetvpn_summary\")\n  |> filter(fn: (r) => r[\"_field\"] == \"avg_response_time\")\n  |> group(columns: [\"check_type\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> yield(name: \"response_times\")",
           "refId": "A"
         }
       ],
-      "title": "Success Rates",
+      "title": "Response Times by Check Type",
       "type": "timeseries"
     },
     {
-      "datasource": "Prometheus",
-      "description": "System resource usage and performance metrics",
+      "datasource": "InfluxDB",
+      "description": "Recent log entries and events",
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
+            "mode": "thresholds"
           },
           "custom": {
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "vis": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
+            "align": "left",
+            "displayMode": "auto",
+            "inspect": false
           },
           "mappings": [],
           "thresholds": {
@@ -775,25 +669,42 @@
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
-          },
-          "unit": "percent"
+          }
         },
         "overrides": [
           {
             "matcher": {
               "id": "byName",
-              "options": "Load Average"
+              "options": "Level"
             },
             "properties": [
               {
-                "id": "unit",
-                "value": "short"
+                "id": "custom.displayMode",
+                "value": "color-background"
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "ERROR": {
+                        "color": "red",
+                        "index": 0
+                      },
+                      "INFO": {
+                        "color": "blue",
+                        "index": 1
+                      },
+                      "WARN": {
+                        "color": "orange",
+                        "index": 2
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
               }
             ]
           }
@@ -805,43 +716,40 @@
         "x": 0,
         "y": 20
       },
-      "id": 7,
+      "id": 9,
       "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
+        "showHeader": true
       },
+      "pluginVersion": "8.5.0",
       "targets": [
         {
-          "datasource": "Prometheus",
-          "expr": "nzbgetvpn_memory_usage_percent",
-          "interval": "",
-          "legendFormat": "Memory Usage %",
+          "datasource": "InfluxDB",
+          "query": "from(bucket: \"metrics\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"nzbgetvpn_health_status\")\n  |> filter(fn: (r) => r[\"_field\"] == \"message\")\n  |> sort(columns: [\"_time\"], desc: true)\n  |> limit(n: 50)\n  |> yield(name: \"recent_events\")",
           "refId": "A"
-        },
-        {
-          "datasource": "Prometheus",
-          "expr": "nzbgetvpn_cpu_usage_percent",
-          "interval": "",
-          "legendFormat": "CPU Usage %",
-          "refId": "B"
-        },
-        {
-          "datasource": "Prometheus",
-          "expr": "nzbgetvpn_load_average",
-          "interval": "",
-          "legendFormat": "Load Average",
-          "refId": "C"
         }
       ],
-      "title": "System Resources",
-      "type": "timeseries"
+      "title": "Recent Health Check Events",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "_measurement": true,
+              "_start": true,
+              "_stop": true,
+              "result": true,
+              "table": true
+            },
+            "indexByName": {},
+            "renameByName": {
+              "_field": "Field",
+              "_time": "Time",
+              "_value": "Message"
+            }
+          }
+        }
+      ],
+      "type": "table"
     }
   ],
   "refresh": "30s",
@@ -850,6 +758,7 @@
   "tags": [
     "nzbgetvpn",
     "monitoring",
+    "influxdb",
     "vpn",
     "health"
   ],
@@ -862,7 +771,7 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "🛡️ nzbgetvpn Monitoring Dashboard",
-  "uid": "nzbgetvpn-monitoring",
-  "version": 2
+  "title": "🛡️ nzbgetvpn InfluxDB Dashboard",
+  "uid": "nzbgetvpn-influxdb",
+  "version": 1
 } 

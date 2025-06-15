@@ -2,6 +2,38 @@
 
 All notable changes to nzbgetvpn will be documented in this file.
 
+## [v25.0.32] - 2025-01-27
+
+### 🎨 Beautiful Monitoring Dashboard Overhaul
+- **Completely Redesigned Grafana Dashboard**: Professional, modern interface
+  - 🎨 Beautiful dark theme with color-coded status indicators
+  - 📊 Real-time health status with visual background colors
+  - ⏱️ Container uptime tracking and system resource monitoring
+  - 🌐 External IP (VPN) display with proper labeling
+  - 📈 Historical trend analysis and performance metrics
+  - 🎯 Individual health check status table with color coding
+
+### 🚀 Enhanced Monitoring Server
+- **Comprehensive Metrics Addition**: Extended monitoring capabilities
+  - System metrics: CPU usage, memory usage, load average
+  - Container metrics: Start time, uptime, external IP tracking
+  - Enhanced Prometheus metrics with proper labels and help text
+  - Improved error handling and logging throughout
+
+### 📚 Documentation Excellence
+- **Complete MONITORING_SETUP.md Rewrite**: Professional documentation
+  - 📝 Step-by-step setup guides with clear sections and emojis
+  - 🎯 Feature highlights of enhanced dashboards
+  - 🔔 Alerting configuration examples and best practices
+  - 🛡️ Security considerations and production deployment guides
+  - 🔧 Comprehensive troubleshooting section
+
+### 🔧 Technical Improvements
+- **Enhanced Prometheus Configuration**: Better scraping strategy
+- **Improved Dashboard UX**: 30-second auto-refresh, helpful descriptions
+- **Mobile-Friendly Design**: Responsive dashboard that works on all devices
+- **Professional Monitoring**: Production-ready monitoring stack
+
 ## [v25.0.31] - 2025-01-27
 
 ### 🚀 Docker Hub & CI/CD Improvements

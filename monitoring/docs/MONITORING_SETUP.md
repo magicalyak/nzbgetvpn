@@ -1,35 +1,49 @@
 # nzbgetvpn Monitoring Setup Guide
 
-This guide explains how to set up monitoring for your nzbgetvpn container using either Prometheus or InfluxDB2.
+This guide explains how to set up comprehensive monitoring for your nzbgetvpn container using either Prometheus or InfluxDB2 with beautiful, functional Grafana dashboards.
 
-## Available Metrics
+## 🎯 Available Metrics & Endpoints
 
 Your nzbgetvpn container exposes the following monitoring endpoints on port 8080:
 
 - `/health` - Current health status (JSON)
-- `/metrics` - Historical metrics and summary (JSON)
+- `/metrics` - Historical metrics and summary (JSON)  
 - `/status` - Detailed system status (JSON)
 - `/logs` - Recent log entries (JSON)
 - `/prometheus` - Prometheus-compatible metrics (text)
 
-## Metrics Collected
+## 📊 Comprehensive Metrics Collected
 
-- **Health Status**: Overall container health (healthy/unhealthy/degraded/warning)
+### Health & Status Metrics
+- **Overall Health**: Container health status (healthy/unhealthy/degraded/warning)
 - **Individual Checks**: NZBGet connectivity, VPN status, DNS resolution, IP leak detection
 - **Response Times**: Average and maximum response times for each check type
 - **Success Rates**: Percentage of successful checks for each check type
-- **System Information**: Memory usage, load average, uptime
-- **Network Information**: External IP address, VPN interface status
 
-## Option 1: Prometheus + Grafana Setup
+### System Metrics
+- **Memory Usage**: Usage percentage and available memory
+- **CPU Usage**: Current CPU utilization percentage  
+- **Load Average**: System load (1, 5, 15 minute averages)
+- **Container Uptime**: How long the container has been running
+
+### Network & VPN Metrics
+- **External IP Address**: Current external IP (should be VPN IP)
+- **VPN Interface Status**: Status of tun0/wg0 interfaces
+- **IP Leak Detection**: Monitoring for IP leaks outside VPN
+
+### Application Metrics
+- **NZBGet Status**: Connectivity and responsiveness to NZBGet
+- **Download Statistics**: Available through NZBGet API integration
+
+## 🚀 Option 1: Prometheus + Grafana Setup (Recommended)
 
 ### Prerequisites
 - Docker and Docker Compose installed
 - Your nzbgetvpn container already running or configured
 
-### Setup Steps
+### Quick Setup
 
-1. **Navigate to the monitoring directory and use the Prometheus docker-compose file**:
+1. **Navigate to the monitoring directory and start the stack**:
    ```bash
    cd monitoring/docker-compose
    
@@ -38,40 +52,88 @@ Your nzbgetvpn container exposes the following monitoring endpoints on port 8080
    ```
 
 2. **Access the services**:
-   - **Grafana**: http://localhost:3000 (admin/admin123)
-   - **Prometheus**: http://localhost:9090
-   - **nzbgetvpn monitoring**: http://localhost:8080
+   - **🎨 Grafana Dashboard**: http://localhost:3000 (admin/admin123)
+   - **📊 Prometheus**: http://localhost:9090  
+   - **🔧 nzbgetvpn Monitoring API**: http://localhost:8080
 
-3. **View the dashboard**:
-   - Login to Grafana
-   - Navigate to Dashboards → nzbgetvpn Monitoring
-   - The dashboard will show health status, response times, success rates, and individual check statuses
+3. **View the enhanced dashboard**:
+   - Login to Grafana with admin/admin123
+   - Navigate to Dashboards → 🛡️ nzbgetvpn Monitoring Dashboard
+   - Enjoy beautiful visualizations with:
+     - ✅ Real-time health status indicators
+     - 📈 Historical trend analysis
+     - 🎯 Individual check status monitoring
+     - 💻 System resource usage graphs
+     - 🌐 VPN status and external IP tracking
 
 ### Prometheus Configuration
 
-The Prometheus configuration (`monitoring/prometheus.yml`) includes:
+The enhanced Prometheus configuration includes:
 
-- **nzbgetvpn job**: Scrapes `/prometheus` endpoint every 30 seconds
-- **nzbgetvpn-health job**: Monitors `/health` endpoint every 15 seconds
-- **prometheus job**: Self-monitoring
+```yaml
+scrape_configs:
+  # Main metrics endpoint (30s interval)
+  - job_name: 'nzbgetvpn'
+    static_configs:
+      - targets: ['nzbgetvpn:8080']
+    metrics_path: '/prometheus'
+    scrape_interval: 30s
+    
+  # Health endpoint (15s interval for faster alerting)
+  - job_name: 'nzbgetvpn-health'
+    static_configs:
+      - targets: ['nzbgetvpn:8080']
+    metrics_path: '/health'
+    scrape_interval: 15s
+```
+
+### 📊 Enhanced Dashboard Features
+
+Our beautiful Grafana dashboard includes:
+
+#### Status Overview Section
+- **🟢 Health Status Indicator**: Color-coded health status (Green=Healthy, Red=Unhealthy)
+- **⏱️ Container Uptime**: Shows how long the container has been running
+- **🌐 External IP Display**: Current VPN IP address
+- **📋 Health Check Table**: Status of all individual checks
+
+#### Historical Analysis Section  
+- **📈 Health Status Over Time**: Historical view of container health
+- **🔍 Individual Check Status**: Track specific check failures over time
+- **⚡ Response Times**: Monitor performance of health checks
+- **📊 Success Rates**: Success percentage for each check type
+
+#### System Resources Section
+- **💾 Memory Usage**: Real-time memory consumption
+- **⚙️ CPU Usage**: Current CPU utilization
+- **📊 Load Average**: System load monitoring
 
 ### Available Prometheus Metrics
 
-```
-# Overall health status (1=healthy, 0=unhealthy)
+```promql
+# Health status (1=healthy, 0=unhealthy)
 nzbgetvpn_health_check
 
-# Individual check status by check name
-nzbgetvpn_check{check="nzbget|vpn|dns|ip_leak"}
+# Individual check status by type
+nzbgetvpn_check{check="nzbget|vpn_interface|dns|ip_leak"}
 
-# Response times for each check type
+# Response times with statistics
 nzbgetvpn_response_time_seconds{check="type",stat="average|maximum"}
 
-# Success rate percentage by check type
+# Success rates by check type  
 nzbgetvpn_success_rate_percent{check="type"}
+
+# System metrics
+nzbgetvpn_memory_usage_percent
+nzbgetvpn_cpu_usage_percent  
+nzbgetvpn_load_average
+
+# Container info
+nzbgetvpn_start_time
+nzbgetvpn_external_ip_info{ip="x.x.x.x"}
 ```
 
-## Option 2: InfluxDB2 + Telegraf + Grafana Setup
+## 🗄️ Option 2: InfluxDB2 + Telegraf + Grafana Setup
 
 ### Prerequisites
 - Docker and Docker Compose installed
@@ -79,94 +141,98 @@ nzbgetvpn_success_rate_percent{check="type"}
 
 ### Setup Steps
 
-1. **Navigate to the monitoring directory and use the InfluxDB docker-compose file**:
+1. **Start the InfluxDB monitoring stack**:
    ```bash
    cd monitoring/docker-compose
    
-   # Start the monitoring stack
+   # Start the complete InfluxDB stack
    docker-compose -f docker-compose.monitoring-influxdb.yml up -d
    ```
 
 2. **Access the services**:
-   - **Grafana**: http://localhost:3000 (admin/admin123)
-   - **InfluxDB**: http://localhost:8086 (admin/password123)
-   - **nzbgetvpn monitoring**: http://localhost:8080
+   - **🎨 Grafana Dashboard**: http://localhost:3000 (admin/admin123)
+   - **🗄️ InfluxDB UI**: http://localhost:8086 (admin/password123)
+   - **🔧 nzbgetvpn Monitoring**: http://localhost:8080
 
-3. **Configure InfluxDB** (optional - already pre-configured):
-   - Organization: `nzbgetvpn`
-   - Bucket: `metrics`
-   - Token: `nzbgetvpn-monitoring-token`
+3. **Pre-configured InfluxDB settings**:
+   - **Organization**: `nzbgetvpn`
+   - **Bucket**: `metrics`  
+   - **Token**: `nzbgetvpn-monitoring-token`
 
-### Telegraf Configuration
+### Telegraf Data Collection
 
-The Telegraf configuration (`monitoring/telegraf.conf`) collects data from multiple endpoints:
+Telegraf collects data from multiple endpoints:
 
-- **JSON Metrics**: `/metrics` endpoint for detailed statistics
-- **Health Status**: `/health` endpoint for current health
-- **System Status**: `/status` endpoint for system information
-- **Prometheus Metrics**: `/prometheus` endpoint as an alternative source
-
-### InfluxDB Measurements
-
-Data is stored in these InfluxDB measurements:
-
-- `nzbgetvpn_summary` - Success rates, response times by check type
-- `nzbgetvpn_health_status` - Overall health status and messages
-- `nzbgetvpn_system` - System metrics (memory, load, uptime)
-- Prometheus metrics (if using the prometheus input)
-
-## Directory Structure
-
-The monitoring setup is organized as follows:
-
-```
-monitoring/
-├── docker-compose/                          # Docker Compose files
-│   ├── docker-compose.monitoring-prometheus.yml
-│   └── docker-compose.monitoring-influxdb.yml
-├── docs/                                    # Documentation
-│   └── MONITORING_SETUP.md
-├── grafana/                                 # Prometheus Grafana configs
-│   ├── dashboards/
-│   │   ├── dashboard.yml
-│   │   └── nzbgetvpn-dashboard.json
-│   └── datasources/
-│       └── prometheus.yml
-├── grafana-influx/                          # InfluxDB Grafana configs
-│   ├── dashboards/
-│   │   └── dashboard.yml
-│   └── datasources/
-│       └── influxdb.yml
-├── prometheus.yml                           # Prometheus configuration
-└── telegraf.conf                           # Telegraf configuration
+```toml
+# JSON metrics from /metrics endpoint
+[[inputs.http]]
+  urls = ["http://nzbgetvpn:8080/metrics"]
+  data_format = "json"
+  interval = "30s"
+  
+# Health status from /health endpoint  
+[[inputs.http]]
+  urls = ["http://nzbgetvpn:8080/health"]
+  data_format = "json"
+  interval = "15s"
+  
+# System status from /status endpoint
+[[inputs.http]]
+  urls = ["http://nzbgetvpn:8080/status"]
+  data_format = "json"
+  interval = "60s"
 ```
 
-## Customization
+### InfluxDB Data Structure
 
-### Environment Variables
+Data is organized into these measurements:
 
-You can customize the monitoring behavior with these environment variables in your `.env` file:
+```
+nzbgetvpn_health_status
+├── status (healthy/unhealthy/degraded/warning)
+├── message (status message)
+└── timestamp
 
-```bash
-# Monitoring server port (default: 8080)
-MONITORING_PORT=8080
+nzbgetvpn_summary  
+├── success_rate (by check_type tag)
+├── avg_response_time (by check_type tag)
+├── max_response_time (by check_type tag)
+└── check_count
 
-# Monitoring log level (default: INFO)
-MONITORING_LOG_LEVEL=DEBUG
-
-# Enable monitoring server (default: enabled if port is exposed)
-ENABLE_MONITORING=yes
+nzbgetvpn_system
+├── memory_usage_percent
+├── cpu_usage_percent
+├── load_average_1min
+├── uptime_seconds
+└── external_ip
 ```
 
-### Custom Alerts
+## 🎨 Dashboard Customization
 
-#### Prometheus Alerting Rules
+### Color Schemes & Theming
+- **Dark Theme**: Professional dark background for 24/7 monitoring
+- **Color-coded Status**: Green (healthy), Red (unhealthy), Orange (degraded), Yellow (warning)
+- **Threshold-based Coloring**: Automatic color changes based on metric values
+
+### Panel Descriptions
+Every panel includes helpful descriptions explaining:
+- What the metric measures
+- What values are expected
+- When to be concerned about the values
+
+### Auto-refresh
+- **30-second refresh**: Dashboards automatically update every 30 seconds
+- **Real-time monitoring**: Near real-time visibility into container health
+
+## 🔔 Alerting & Notifications
+
+### Prometheus Alerting Rules
 
 Create `monitoring/alert_rules.yml`:
 
 ```yaml
 groups:
-  - name: nzbgetvpn
+  - name: nzbgetvpn_alerts
     rules:
       - alert: NZBGetVPNDown
         expr: nzbgetvpn_health_check == 0
@@ -175,17 +241,17 @@ groups:
           severity: critical
         annotations:
           summary: "nzbgetvpn container is unhealthy"
-          description: "nzbgetvpn has been unhealthy for more than 2 minutes"
+          description: "Container has been unhealthy for more than 2 minutes"
 
-      - alert: VPNDisconnected
-        expr: nzbgetvpn_check{check="vpn"} == 0
+      - alert: VPNDisconnected  
+        expr: nzbgetvpn_check{check="vpn_interface"} == 0
         for: 1m
         labels:
           severity: warning
         annotations:
           summary: "VPN connection lost"
-          description: "VPN check is failing"
-
+          description: "VPN interface check is failing"
+          
       - alert: HighResponseTime
         expr: nzbgetvpn_response_time_seconds{stat="average"} > 5
         for: 5m
@@ -194,156 +260,195 @@ groups:
         annotations:
           summary: "High response times detected"
           description: "Average response time is {{ $value }}s"
+          
+      - alert: IPLeakDetected
+        expr: nzbgetvpn_check{check="ip_leak"} == 0  
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "IP leak detected!"
+          description: "Traffic may be bypassing VPN"
 ```
 
-#### InfluxDB Alerting
+### InfluxDB Alerting (Kapacitor)
 
-Use InfluxDB's built-in alerting or integrate with external tools like Grafana alerts.
+For InfluxDB setups, you can use Kapacitor for alerting:
 
-### Custom Dashboards
-
-#### Prometheus/Grafana Queries
-
-Useful PromQL queries for creating custom dashboards:
-
-```promql
-# Health status over time
-nzbgetvpn_health_check
-
-# Response time by check type
-avg by (check) (nzbgetvpn_response_time_seconds{stat="average"})
-
-# Success rate trend
-avg_over_time(nzbgetvpn_success_rate_percent[1h])
-
-# Check status matrix
-nzbgetvpn_check
+```javascript
+stream
+  |from()
+    .measurement('nzbgetvpn_health_status')
+    .where(lambda: "host" == 'nzbgetvpn')
+  |alert()
+    .crit(lambda: "status" != 'healthy')
+    .message('nzbgetvpn container is unhealthy: {{ .Level }}')
+    .slack()
 ```
 
-#### InfluxDB/Flux Queries
+## 📁 Directory Structure
 
-Useful Flux queries for InfluxDB dashboards:
+The monitoring setup is organized as follows:
 
-```flux
-// Health status over time
-from(bucket: "metrics")
-  |> range(start: -1h)
-  |> filter(fn: (r) => r._measurement == "nzbgetvpn_health_status")
-  |> filter(fn: (r) => r._field == "overall_status")
-
-// Average response times
-from(bucket: "metrics")
-  |> range(start: -1h)
-  |> filter(fn: (r) => r._measurement == "nzbgetvpn_summary")
-  |> filter(fn: (r) => r._field == "avg_response_time")
-  |> group(columns: ["check_type"])
-
-// Memory usage trend
-from(bucket: "metrics")
-  |> range(start: -6h)
-  |> filter(fn: (r) => r._measurement == "nzbgetvpn_system")
-  |> filter(fn: (r) => r._field == "memory_usage_percent")
+```
+monitoring/
+├── docker-compose/                          # Docker Compose files
+│   ├── docker-compose.monitoring-prometheus.yml
+│   └── docker-compose.monitoring-influxdb.yml
+├── docs/                                    # Documentation  
+│   └── MONITORING_SETUP.md
+├── grafana/                                 # Prometheus Grafana configs
+│   ├── dashboards/
+│   │   ├── dashboard.yml                    # Dashboard provisioning
+│   │   └── nzbgetvpn-dashboard.json        # Beautiful Prometheus dashboard
+│   └── datasources/
+│       └── prometheus.yml                   # Prometheus datasource config
+├── grafana-influx/                          # InfluxDB Grafana configs  
+│   ├── dashboards/
+│   │   ├── dashboard.yml                    # Dashboard provisioning
+│   │   └── nzbgetvpn-influxdb-dashboard.json # Beautiful InfluxDB dashboard
+│   └── datasources/
+│       └── influxdb.yml                     # InfluxDB datasource config
+├── prometheus.yml                           # Prometheus configuration
+└── telegraf.conf                           # Telegraf configuration
 ```
 
-## Troubleshooting
+## ⚙️ Environment Variables & Customization
+
+### Monitoring Configuration
+
+Customize monitoring behavior in your `.env` file:
+
+```bash
+# Enable monitoring server (default: yes)
+ENABLE_MONITORING=yes
+
+# Monitoring server port (default: 8080)  
+MONITORING_PORT=8080
+
+# Monitoring log level (default: INFO)
+MONITORING_LOG_LEVEL=INFO
+
+# Debug mode for troubleshooting
+DEBUG=false
+```
+
+### Dashboard Customization
+
+#### Time Ranges
+- **Default**: Last 1 hour
+- **Available**: 5m, 15m, 30m, 1h, 3h, 6h, 12h, 24h, 2d, 7d, 30d
+
+#### Refresh Intervals  
+- **Default**: 30 seconds
+- **Available**: 5s, 10s, 30s, 1m, 5m, 15m, 30m, 1h
+
+## 🔧 Troubleshooting
 
 ### Common Issues
 
-1. **Metrics not appearing**:
-   - Check that port 8080 is exposed on your nzbgetvpn container
-   - Verify the monitoring server is running: `curl http://localhost:8080/health`
-   - Check container logs for monitoring-related errors
-
-2. **Prometheus can't scrape metrics**:
-   - Ensure containers are on the same Docker network
-   - Check Prometheus targets page: http://localhost:9090/targets
-   - Verify the `/prometheus` endpoint returns data
-
-3. **InfluxDB connection issues**:
-   - Check Telegraf logs: `docker logs telegraf`
-   - Verify InfluxDB is accessible: `curl http://localhost:8086/health`
-   - Confirm the token and organization settings
-
-4. **Grafana dashboard shows no data**:
-   - Check the data source connection in Grafana settings
-   - Verify the time range matches when metrics started collecting
-   - Use Grafana's query builder to test queries
-
-5. **Docker-compose path issues**:
-   - Ensure you're running docker-compose from the `monitoring/docker-compose/` directory
-   - Check that your `.env` file is in the project root (two levels up from docker-compose files)
-   - Verify config and downloads directories exist in the project root
-
-### Log Files
-
-Monitor these log files for troubleshooting:
-
-- `/config/monitoring.log` - Monitoring server logs
-- `/config/healthcheck.log` - Health check logs
-- `/config/metrics.json` - Historical metrics data
-- `/tmp/nzbgetvpn_status.json` - Current status file
-
-### Manual Testing
-
-Test the monitoring endpoints manually:
-
+**Dashboard shows "No data":**
 ```bash
-# Test health endpoint
-curl http://localhost:8080/health | jq
+# Check if monitoring server is running
+curl http://localhost:8080/health
 
-# Test metrics endpoint
-curl http://localhost:8080/metrics | jq
+# Check Prometheus targets
+# Visit http://localhost:9090/targets
 
-# Test Prometheus endpoint
-curl http://localhost:8080/prometheus
+# Check container logs
+docker logs nzbgetvpn
+docker logs prometheus  
+docker logs grafana
+```
 
-# Test detailed status
+**High response times:**
+```bash
+# Enable debug logging
+echo "DEBUG=true" >> .env
+docker restart nzbgetvpn
+
+# Check detailed status
 curl http://localhost:8080/status | jq
 ```
 
-## Security Considerations
+**Missing metrics in InfluxDB:**
+```bash
+# Check Telegraf logs
+docker logs telegraf
 
-1. **Change default passwords**: Update Grafana and InfluxDB passwords in the docker-compose files
-2. **Network security**: Consider using Docker secrets for tokens and passwords
-3. **Access control**: Implement reverse proxy with authentication for production use
-4. **Token rotation**: Regularly rotate InfluxDB tokens and update configurations
+# Verify InfluxDB connection
+curl http://localhost:8086/health
 
-## Performance Impact
-
-The monitoring system is designed to be lightweight:
-
-- **CPU usage**: Minimal, health checks run every 30 seconds
-- **Memory usage**: ~50MB for metrics storage and monitoring server
-- **Network usage**: ~1KB per metric collection interval
-- **Storage**: Metrics are rotated automatically, ~10MB per day typical usage
-
-## Integration with External Systems
-
-### Alertmanager Integration
-
-For Prometheus setups, integrate with Alertmanager for notifications:
-
-```yaml
-# Add to prometheus.yml
-rule_files:
-  - "alert_rules.yml"
-
-alerting:
-  alertmanagers:
-    - static_configs:
-        - targets:
-          - alertmanager:9093
+# Check bucket and token configuration
 ```
 
-### Webhook Notifications
+### Performance Optimization
 
-The monitoring endpoints can be integrated with external systems:
+For better performance with large datasets:
 
 ```bash
-# Example webhook for health status changes
-curl -X POST https://your-webhook-url.com/alert \
-  -H "Content-Type: application/json" \
-  -d "$(curl -s http://localhost:8080/health)"
+# Prometheus retention (in docker-compose)
+--storage.tsdb.retention.time=30d
+
+# InfluxDB retention policy
+influx setup --retention 2160h  # 90 days
+
+# Reduce scrape intervals for less critical metrics
+scrape_interval: 60s  # Instead of 30s
 ```
 
-This monitoring setup provides comprehensive visibility into your nzbgetvpn container's health and performance, helping you identify issues quickly and maintain optimal operation. 
+## 🛡️ Security Considerations
+
+### Production Deployment
+
+1. **Change default passwords**: Update Grafana and InfluxDB passwords
+2. **Network security**: Use Docker secrets for tokens and passwords
+3. **Access control**: Configure authentication and authorization
+4. **Token rotation**: Regularly rotate InfluxDB tokens
+5. **HTTPS**: Enable TLS for web interfaces
+
+### Secure Configuration Example
+
+```yaml
+# docker-compose.override.yml
+version: "3.8"
+services:
+  grafana:
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD_FILE=/run/secrets/grafana_password
+    secrets:
+      - grafana_password
+      
+secrets:
+  grafana_password:
+    external: true
+```
+
+## 🎯 What Makes These Dashboards Special
+
+### 🎨 Beautiful Design
+- **Modern Dark Theme**: Easy on the eyes for 24/7 monitoring
+- **Color-coded Status**: Instant visual feedback on system health
+- **Professional Layout**: Clean, organized panels with logical grouping
+
+### 📊 Comprehensive Coverage  
+- **Health Monitoring**: Overall and individual check status
+- **Performance Metrics**: Response times and success rates
+- **System Resources**: Memory, CPU, and load monitoring
+- **Network Status**: VPN IP and connectivity tracking
+
+### 🚀 User Experience
+- **Instant Updates**: 30-second auto-refresh for real-time monitoring
+- **Helpful Descriptions**: Every panel explains what it shows
+- **Quick Links**: Direct access to monitoring API and management interfaces
+- **Mobile Friendly**: Responsive design works on all devices
+
+### 🔍 Troubleshooting Ready
+- **Historical Analysis**: Track issues over time
+- **Detailed Drill-down**: Click through for more information
+- **Log Integration**: Recent events and log entries
+- **Alert Integration**: Ready for alerting configuration
+
+---
+
+**🎉 Ready to monitor like a pro?** Choose your stack (Prometheus or InfluxDB) and enjoy beautiful, comprehensive monitoring of your nzbgetvpn container! 

@@ -421,8 +421,62 @@ class MonitoringHandler(BaseHTTPRequestHandler):
                 # Individual check metrics
                 checks = status_data.get('checks', {})
                 for check_name, check_status in checks.items():
-                    check_value = 1 if check_status == 'success' else 0
+                    check_value = 1 if check_status in ['success', 'up'] else 0
                     metrics_lines.append(f'nzbgetvpn_check{{check="{check_name}"}} {check_value}')
+            
+            # Add system metrics
+            system_info = self.get_system_info()
+            if system_info:
+                metrics_lines.extend([
+                    '',
+                    '# HELP nzbgetvpn_memory_usage_percent Memory usage percentage',
+                    '# TYPE nzbgetvpn_memory_usage_percent gauge',
+                    f'nzbgetvpn_memory_usage_percent {system_info.get("memory", {}).get("usage_percent", 0)}',
+                    '',
+                    '# HELP nzbgetvpn_load_average System load average (1 minute)',
+                    '# TYPE nzbgetvpn_load_average gauge',
+                    f'nzbgetvpn_load_average {system_info.get("load_average", {}).get("1min", 0)}',
+                ])
+            
+            # Add uptime metric
+            uptime_info = self.get_uptime()
+            start_time = time.time() - uptime_info.get('seconds', 0)
+            metrics_lines.extend([
+                '',
+                '# HELP nzbgetvpn_start_time Container start time (Unix timestamp)',
+                '# TYPE nzbgetvpn_start_time gauge',
+                f'nzbgetvpn_start_time {start_time}',
+            ])
+            
+            # Add network info
+            network_info = self.get_network_info()
+            external_ip = network_info.get('external_ip', 'unknown')
+            if external_ip != 'unknown':
+                metrics_lines.extend([
+                    '',
+                    '# HELP nzbgetvpn_external_ip_info External IP address information',
+                    '# TYPE nzbgetvpn_external_ip_info gauge',
+                    f'nzbgetvpn_external_ip_info{{ip="{external_ip}"}} 1',
+                ])
+            
+            # Add CPU usage (if available)
+            try:
+                # Simple CPU usage calculation
+                with open('/proc/stat', 'r') as f:
+                    cpu_line = f.readline()
+                    cpu_times = [int(x) for x in cpu_line.split()[1:]]
+                    idle_time = cpu_times[3]
+                    total_time = sum(cpu_times)
+                    cpu_usage = round((1 - idle_time / total_time) * 100, 2) if total_time > 0 else 0
+                    
+                    metrics_lines.extend([
+                        '',
+                        '# HELP nzbgetvpn_cpu_usage_percent CPU usage percentage',
+                        '# TYPE nzbgetvpn_cpu_usage_percent gauge',
+                        f'nzbgetvpn_cpu_usage_percent {cpu_usage}',
+                    ])
+            except:
+                pass
             
             # Read metrics file for response times
             if os.path.exists(METRICS_FILE):
@@ -435,6 +489,9 @@ class MonitoringHandler(BaseHTTPRequestHandler):
                     '',
                     '# HELP nzbgetvpn_response_time_seconds Response time for health checks',
                     '# TYPE nzbgetvpn_response_time_seconds gauge',
+                    '',
+                    '# HELP nzbgetvpn_success_rate_percent Success rate percentage for health checks',
+                    '# TYPE nzbgetvpn_success_rate_percent gauge',
                 ])
                 
                 for check_type, stats in summary.items():
@@ -449,6 +506,7 @@ class MonitoringHandler(BaseHTTPRequestHandler):
                     ])
         
         except Exception as e:
+            logger.error(f"Error generating Prometheus metrics: {e}")
             metrics_lines.append(f'# Error: {e}')
         
         return '\n'.join(metrics_lines) + '\n'
