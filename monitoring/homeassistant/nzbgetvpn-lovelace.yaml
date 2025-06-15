@@ -1,0 +1,350 @@
+# Home Assistant Lovelace Configuration for nzbgetvpn Enhanced Monitoring
+# This configuration provides comprehensive monitoring of your nzbgetvpn container
+# with all the enhanced health checks, VPN status, and system metrics
+
+# Add these sensors to your configuration.yaml first:
+# sensor:
+#   - platform: rest
+#     name: nzbgetvpn_health
+#     resource: http://rocky.gamull.com:8080/health
+#     scan_interval: 30
+#     json_attributes:
+#       - status
+#       - exit_code
+#       - vpn_interface
+#       - external_ip
+#       - checks
+#       - configuration
+#     value_template: "{{ value_json.status }}"
+#   
+#   - platform: rest
+#     name: nzbgetvpn_status
+#     resource: http://rocky.gamull.com:8080/status
+#     scan_interval: 60
+#     json_attributes:
+#       - system
+#       - vpn
+#       - nzbget
+#       - network
+#       - uptime
+#     value_template: "{{ value_json.timestamp }}"
+
+# Lovelace Card Configuration
+type: vertical-stack
+cards:
+  # Main Status Header
+  - type: horizontal-stack
+    cards:
+      - type: entity
+        entity: sensor.nzbgetvpn_health
+        name: "🛡️ nzbgetvpn Status"
+        icon: mdi:shield-check
+        state_color: true
+        card_mod:
+          style: |
+            ha-card {
+              background: {% if states('sensor.nzbgetvpn_health') == 'healthy' %}
+                linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+              {% elif states('sensor.nzbgetvpn_health') == 'warning' %}
+                linear-gradient(135deg, #FF9800 0%, #f57c00 100%);
+              {% elif states('sensor.nzbgetvpn_health') == 'degraded' %}
+                linear-gradient(135deg, #FF5722 0%, #d84315 100%);
+              {% else %}
+                linear-gradient(135deg, #F44336 0%, #c62828 100%);
+              {% endif %}
+              color: white;
+              font-weight: bold;
+            }
+      
+      - type: entity
+        entity: sensor.nzbgetvpn_health
+        name: "🌐 External IP"
+        attribute: external_ip
+        icon: mdi:ip-network
+        
+      - type: entity
+        entity: sensor.nzbgetvpn_health
+        name: "🔗 VPN Interface"
+        attribute: vpn_interface
+        icon: mdi:vpn
+
+  # Individual Health Checks Grid
+  - type: grid
+    columns: 4
+    square: false
+    cards:
+      # NZBGet Check
+      - type: entity
+        entity: sensor.nzbgetvpn_health
+        name: "NZBGet"
+        icon: mdi:download
+        attribute: checks.nzbget
+        card_mod:
+          style: |
+            ha-card {
+              background: {% if state_attr('sensor.nzbgetvpn_health', 'checks')['nzbget'] == 'success' %}
+                #4CAF50;
+              {% else %}
+                #F44336;
+              {% endif %}
+              color: white;
+            }
+      
+      # VPN Interface Check
+      - type: entity
+        entity: sensor.nzbgetvpn_health
+        name: "VPN Interface"
+        icon: mdi:vpn
+        attribute: checks.vpn_interface
+        card_mod:
+          style: |
+            ha-card {
+              background: {% if state_attr('sensor.nzbgetvpn_health', 'checks')['vpn_interface'] == 'up' %}
+                #4CAF50;
+              {% else %}
+                #F44336;
+              {% endif %}
+              color: white;
+            }
+      
+      # VPN Connectivity Check
+      - type: entity
+        entity: sensor.nzbgetvpn_health
+        name: "VPN Connectivity"
+        icon: mdi:network-outline
+        attribute: checks.vpn_connectivity
+        card_mod:
+          style: |
+            ha-card {
+              background: {% if state_attr('sensor.nzbgetvpn_health', 'checks')['vpn_connectivity'] == 'success' %}
+                #4CAF50;
+              {% elif state_attr('sensor.nzbgetvpn_health', 'checks')['vpn_connectivity'] == 'unknown' %}
+                #9E9E9E;
+              {% else %}
+                #FF5722;
+              {% endif %}
+              color: white;
+            }
+      
+      # DNS Check
+      - type: entity
+        entity: sensor.nzbgetvpn_health
+        name: "DNS Resolution"
+        icon: mdi:dns
+        attribute: checks.dns
+        card_mod:
+          style: |
+            ha-card {
+              background: {% if state_attr('sensor.nzbgetvpn_health', 'checks')['dns'] == 'success' %}
+                #4CAF50;
+              {% else %}
+                #FF5722;
+              {% endif %}
+              color: white;
+            }
+      
+      # News Server Check
+      - type: entity
+        entity: sensor.nzbgetvpn_health
+        name: "News Server"
+        icon: mdi:newspaper
+        attribute: checks.news_server
+        card_mod:
+          style: |
+            ha-card {
+              background: {% if state_attr('sensor.nzbgetvpn_health', 'checks')['news_server'] == 'success' %}
+                #4CAF50;
+              {% elif state_attr('sensor.nzbgetvpn_health', 'checks')['news_server'] == 'unknown' %}
+                #9E9E9E;
+              {% else %}
+                #FF9800;
+              {% endif %}
+              color: white;
+            }
+      
+      # IP Leak Check
+      - type: entity
+        entity: sensor.nzbgetvpn_health
+        name: "IP Leak"
+        icon: mdi:shield-alert
+        attribute: checks.ip_leak
+        card_mod:
+          style: |
+            ha-card {
+              background: {% if state_attr('sensor.nzbgetvpn_health', 'checks')['ip_leak'] == 'stable' %}
+                #4CAF50;
+              {% elif state_attr('sensor.nzbgetvpn_health', 'checks')['ip_leak'] == 'unknown' %}
+                #9E9E9E;
+              {% else %}
+                #FF9800;
+              {% endif %}
+              color: white;
+            }
+      
+      # DNS Leak Check
+      - type: entity
+        entity: sensor.nzbgetvpn_health
+        name: "DNS Leak"
+        icon: mdi:shield-lock
+        attribute: checks.dns_leak
+        card_mod:
+          style: |
+            ha-card {
+              background: {% if state_attr('sensor.nzbgetvpn_health', 'checks')['dns_leak'] == 'stable' %}
+                #4CAF50;
+              {% elif state_attr('sensor.nzbgetvpn_health', 'checks')['dns_leak'] == 'unknown' %}
+                #9E9E9E;
+              {% else %}
+                #FF9800;
+              {% endif %}
+              color: white;
+            }
+      
+      # Exit Code
+      - type: entity
+        entity: sensor.nzbgetvpn_health
+        name: "Exit Code"
+        icon: mdi:exit-run
+        attribute: exit_code
+        card_mod:
+          style: |
+            ha-card {
+              background: {% if state_attr('sensor.nzbgetvpn_health', 'exit_code') == 0 %}
+                #4CAF50;
+              {% else %}
+                #F44336;
+              {% endif %}
+              color: white;
+            }
+
+  # System Metrics
+  - type: entities
+    title: "📊 System Metrics"
+    show_header_toggle: false
+    entities:
+      - type: custom:bar-card
+        entity: sensor.nzbgetvpn_status
+        name: "Memory Usage"
+        attribute: system.memory.usage_percent
+        unit: "%"
+        max: 100
+        severity:
+          - color: "#4CAF50"
+            from: 0
+            to: 60
+          - color: "#FF9800"
+            from: 60
+            to: 80
+          - color: "#F44336"
+            from: 80
+            to: 100
+      
+      - type: custom:bar-card
+        entity: sensor.nzbgetvpn_status
+        name: "CPU Usage"
+        attribute: system.cpu.usage_percent
+        unit: "%"
+        max: 100
+        severity:
+          - color: "#4CAF50"
+            from: 0
+            to: 60
+          - color: "#FF9800"
+            from: 60
+            to: 80
+          - color: "#F44336"
+            from: 80
+            to: 100
+      
+      - entity: sensor.nzbgetvpn_status
+        name: "Load Average (1min)"
+        attribute: system.load_average.1min
+        icon: mdi:speedometer
+      
+      - entity: sensor.nzbgetvpn_status
+        name: "Container Uptime"
+        attribute: uptime.human
+        icon: mdi:clock-outline
+
+  # Configuration Status
+  - type: entities
+    title: "⚙️ Health Check Configuration"
+    show_header_toggle: false
+    entities:
+      - entity: sensor.nzbgetvpn_health
+        name: "Metrics Enabled"
+        attribute: configuration.metrics_enabled
+        icon: mdi:chart-line
+      
+      - entity: sensor.nzbgetvpn_health
+        name: "DNS Leak Check"
+        attribute: configuration.check_dns_leak
+        icon: mdi:shield-lock
+      
+      - entity: sensor.nzbgetvpn_health
+        name: "IP Leak Check"
+        attribute: configuration.check_ip_leak
+        icon: mdi:shield-alert
+      
+      - entity: sensor.nzbgetvpn_health
+        name: "VPN Connectivity Check"
+        attribute: configuration.check_vpn_connectivity
+        icon: mdi:network-outline
+      
+      - entity: sensor.nzbgetvpn_health
+        name: "News Server Check"
+        attribute: configuration.check_news_server
+        icon: mdi:newspaper
+      
+      - entity: sensor.nzbgetvpn_health
+        name: "Health Check Host"
+        attribute: configuration.health_check_host
+        icon: mdi:web
+      
+      - entity: sensor.nzbgetvpn_health
+        name: "Check Timeout"
+        attribute: configuration.health_check_timeout
+        icon: mdi:timer
+        unit_of_measurement: "s"
+
+  # Quick Actions
+  - type: horizontal-stack
+    cards:
+      - type: button
+        name: "🔄 Refresh Status"
+        tap_action:
+          action: call-service
+          service: homeassistant.update_entity
+          service_data:
+            entity_id: sensor.nzbgetvpn_health
+        icon: mdi:refresh
+      
+      - type: button
+        name: "📊 View Metrics"
+        tap_action:
+          action: url
+          url_path: "http://rocky.gamull.com:8080/metrics"
+        icon: mdi:chart-line
+      
+      - type: button
+        name: "🌐 NZBGet Web"
+        tap_action:
+          action: url
+          url_path: "http://rocky.gamull.com:6789"
+        icon: mdi:download
+      
+      - type: button
+        name: "📈 Prometheus"
+        tap_action:
+          action: url
+          url_path: "http://rocky.gamull.com:8080/prometheus"
+        icon: mdi:chart-box
+
+  # Status History Chart
+  - type: history-graph
+    title: "📈 Health Status History"
+    hours_to_show: 24
+    refresh_interval: 60
+    entities:
+      - entity: sensor.nzbgetvpn_health
+        name: "Overall Health" 

@@ -1,0 +1,100 @@
+# Simplified Home Assistant Lovelace Card for nzbgetvpn
+# This is a simpler version that doesn't require custom cards
+
+type: vertical-stack
+cards:
+  # Main Status Card
+  - type: glance
+    title: "🛡️ nzbgetvpn Status Monitor"
+    entities:
+      - entity: sensor.nzbgetvpn_health
+        name: "Overall Status"
+        icon: mdi:shield-check
+      - entity: sensor.nzbgetvpn_external_ip
+        name: "External IP"
+        icon: mdi:ip-network
+      - entity: sensor.nzbgetvpn_vpn_interface
+        name: "VPN Interface"
+        icon: mdi:vpn
+      - entity: sensor.nzbgetvpn_uptime
+        name: "Uptime"
+        icon: mdi:clock-outline
+    state_color: true
+
+  # Health Checks Grid
+  - type: glance
+    title: "🔍 Health Checks"
+    entities:
+      - entity: binary_sensor.nzbgetvpn_nzbget_ok
+        name: "NZBGet"
+        icon: mdi:download
+      - entity: binary_sensor.nzbgetvpn_vpn_ok
+        name: "VPN"
+        icon: mdi:vpn
+      - entity: sensor.nzbgetvpn_vpn_connectivity
+        name: "VPN Connectivity"
+        icon: mdi:network
+      - entity: sensor.nzbgetvpn_dns_status
+        name: "DNS"
+        icon: mdi:dns
+      - entity: sensor.nzbgetvpn_news_server
+        name: "News Server"
+        icon: mdi:newspaper
+      - entity: sensor.nzbgetvpn_ip_leak
+        name: "IP Leak"
+        icon: mdi:shield-alert
+    state_color: true
+
+  # System Resources
+  - type: entities
+    title: "📊 System Resources"
+    entities:
+      - entity: sensor.nzbgetvpn_memory_usage
+        name: "Memory Usage"
+        icon: mdi:memory
+        secondary_info: last-updated
+      - entity: sensor.nzbgetvpn_cpu_usage
+        name: "CPU Usage"
+        icon: mdi:cpu-64-bit
+        secondary_info: last-updated
+      - entity: sensor.nzbgetvpn_load_average
+        name: "Load Average"
+        icon: mdi:speedometer
+        secondary_info: last-updated
+
+  # Quick Actions
+  - type: horizontal-stack
+    cards:
+      - type: button
+        name: "Refresh Status"
+        icon: mdi:refresh
+        tap_action:
+          action: call-service
+          service: homeassistant.update_entity
+          service_data:
+            entity_id: sensor.nzbgetvpn_health
+      - type: button
+        name: "View Metrics"
+        icon: mdi:chart-line
+        tap_action:
+          action: url
+          url_path: "http://rocky.gamull.com:8081/metrics"
+      - type: button
+        name: "NZBGet Web"
+        icon: mdi:download
+        tap_action:
+          action: url
+          url_path: "http://rocky.gamull.com:6790"
+
+  # Status History
+  - type: history-graph
+    title: "📈 Health Status History"
+    hours_to_show: 12
+    refresh_interval: 60
+    entities:
+      - entity: binary_sensor.nzbgetvpn_healthy
+        name: "Overall Health"
+      - entity: binary_sensor.nzbgetvpn_nzbget_ok
+        name: "NZBGet"
+      - entity: binary_sensor.nzbgetvpn_vpn_ok
+        name: "VPN" 

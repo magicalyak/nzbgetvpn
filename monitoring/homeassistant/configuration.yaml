@@ -1,0 +1,292 @@
+# Home Assistant Configuration for nzbgetvpn Enhanced Monitoring
+# Add this to your configuration.yaml file
+
+# REST Sensors for nzbgetvpn monitoring
+sensor:
+  # Main health status sensor
+  - platform: rest
+    name: nzbgetvpn_health
+    resource: http://rocky.gamull.com:8081/health
+    scan_interval: 30
+    timeout: 10
+    json_attributes:
+      - status
+      - exit_code
+      - vpn_interface
+      - external_ip
+      - checks
+      - configuration
+      - timestamp
+    value_template: "{{ value_json.status | default('unknown') }}"
+    availability_template: "{{ value_json is defined }}"
+  
+  # Detailed system status sensor
+  - platform: rest
+    name: nzbgetvpn_status
+    resource: http://rocky.gamull.com:8081/status
+    scan_interval: 60
+    timeout: 15
+    json_attributes:
+      - system
+      - vpn
+      - nzbget
+      - network
+      - uptime
+      - timestamp
+    value_template: "{{ value_json.timestamp | default('unknown') }}"
+    availability_template: "{{ value_json is defined }}"
+  
+  # Individual health check sensors (extracted from main sensor)
+  - platform: template
+    sensors:
+      nzbgetvpn_nzbget_status:
+        friendly_name: "NZBGet Status"
+        value_template: >
+          {% if state_attr('sensor.nzbgetvpn_health', 'checks') %}
+            {{ state_attr('sensor.nzbgetvpn_health', 'checks').nzbget | default('unknown') }}
+          {% else %}
+            unknown
+          {% endif %}
+        icon_template: >
+          {% set status = state_attr('sensor.nzbgetvpn_health', 'checks').nzbget if state_attr('sensor.nzbgetvpn_health', 'checks') else 'unknown' %}
+          {% if status == 'success' %}
+            mdi:download
+          {% else %}
+            mdi:download-off
+          {% endif %}
+      
+      nzbgetvpn_vpn_interface:
+        friendly_name: "VPN Interface Status"
+        value_template: >
+          {% if state_attr('sensor.nzbgetvpn_health', 'checks') %}
+            {{ state_attr('sensor.nzbgetvpn_health', 'checks').vpn_interface | default('unknown') }}
+          {% else %}
+            unknown
+          {% endif %}
+        icon_template: >
+          {% set status = state_attr('sensor.nzbgetvpn_health', 'checks').vpn_interface if state_attr('sensor.nzbgetvpn_health', 'checks') else 'unknown' %}
+          {% if status == 'up' %}
+            mdi:vpn
+          {% else %}
+            mdi:vpn-off
+          {% endif %}
+      
+      nzbgetvpn_vpn_connectivity:
+        friendly_name: "VPN Connectivity"
+        value_template: >
+          {% if state_attr('sensor.nzbgetvpn_health', 'checks') %}
+            {{ state_attr('sensor.nzbgetvpn_health', 'checks').vpn_connectivity | default('unknown') }}
+          {% else %}
+            unknown
+          {% endif %}
+        icon_template: >
+          {% set status = state_attr('sensor.nzbgetvpn_health', 'checks').vpn_connectivity if state_attr('sensor.nzbgetvpn_health', 'checks') else 'unknown' %}
+          {% if status == 'success' %}
+            mdi:network
+          {% else %}
+            mdi:network-off
+          {% endif %}
+      
+      nzbgetvpn_dns_status:
+        friendly_name: "DNS Resolution"
+        value_template: >
+          {% if state_attr('sensor.nzbgetvpn_health', 'checks') %}
+            {{ state_attr('sensor.nzbgetvpn_health', 'checks').dns | default('unknown') }}
+          {% else %}
+            unknown
+          {% endif %}
+        icon_template: >
+          {% set status = state_attr('sensor.nzbgetvpn_health', 'checks').dns if state_attr('sensor.nzbgetvpn_health', 'checks') else 'unknown' %}
+          {% if status == 'success' %}
+            mdi:dns
+          {% else %}
+            mdi:dns-off
+          {% endif %}
+      
+      nzbgetvpn_news_server:
+        friendly_name: "News Server"
+        value_template: >
+          {% if state_attr('sensor.nzbgetvpn_health', 'checks') %}
+            {{ state_attr('sensor.nzbgetvpn_health', 'checks').news_server | default('unknown') }}
+          {% else %}
+            unknown
+          {% endif %}
+        icon_template: >
+          {% set status = state_attr('sensor.nzbgetvpn_health', 'checks').news_server if state_attr('sensor.nzbgetvpn_health', 'checks') else 'unknown' %}
+          {% if status == 'success' %}
+            mdi:newspaper
+          {% else %}
+            mdi:newspaper-off
+          {% endif %}
+      
+      nzbgetvpn_ip_leak:
+        friendly_name: "IP Leak Status"
+        value_template: >
+          {% if state_attr('sensor.nzbgetvpn_health', 'checks') %}
+            {{ state_attr('sensor.nzbgetvpn_health', 'checks').ip_leak | default('unknown') }}
+          {% else %}
+            unknown
+          {% endif %}
+        icon_template: >
+          {% set status = state_attr('sensor.nzbgetvpn_health', 'checks').ip_leak if state_attr('sensor.nzbgetvpn_health', 'checks') else 'unknown' %}
+          {% if status == 'stable' %}
+            mdi:shield-check
+          {% elif status == 'changed' %}
+            mdi:shield-alert
+          {% else %}
+            mdi:shield-off
+          {% endif %}
+      
+      nzbgetvpn_dns_leak:
+        friendly_name: "DNS Leak Status"
+        value_template: >
+          {% if state_attr('sensor.nzbgetvpn_health', 'checks') %}
+            {{ state_attr('sensor.nzbgetvpn_health', 'checks').dns_leak | default('unknown') }}
+          {% else %}
+            unknown
+          {% endif %}
+        icon_template: >
+          {% set status = state_attr('sensor.nzbgetvpn_health', 'checks').dns_leak if state_attr('sensor.nzbgetvpn_health', 'checks') else 'unknown' %}
+          {% if status == 'stable' %}
+            mdi:shield-lock
+          {% elif status == 'changed' %}
+            mdi:shield-alert
+          {% else %}
+            mdi:shield-off
+          {% endif %}
+      
+      nzbgetvpn_external_ip:
+        friendly_name: "External IP"
+        value_template: >
+          {{ state_attr('sensor.nzbgetvpn_health', 'external_ip') | default('unknown') }}
+        icon_template: mdi:ip-network
+      
+      nzbgetvpn_memory_usage:
+        friendly_name: "Memory Usage"
+        value_template: >
+          {% if state_attr('sensor.nzbgetvpn_status', 'system') and state_attr('sensor.nzbgetvpn_status', 'system').memory %}
+            {{ state_attr('sensor.nzbgetvpn_status', 'system').memory.usage_percent | round(1) }}
+          {% else %}
+            unknown
+          {% endif %}
+        unit_of_measurement: "%"
+        icon_template: mdi:memory
+      
+      nzbgetvpn_cpu_usage:
+        friendly_name: "CPU Usage"
+        value_template: >
+          {% if state_attr('sensor.nzbgetvpn_status', 'system') and state_attr('sensor.nzbgetvpn_status', 'system').cpu %}
+            {{ state_attr('sensor.nzbgetvpn_status', 'system').cpu.usage_percent | round(1) }}
+          {% else %}
+            unknown
+          {% endif %}
+        unit_of_measurement: "%"
+        icon_template: mdi:cpu-64-bit
+      
+      nzbgetvpn_load_average:
+        friendly_name: "Load Average"
+        value_template: >
+          {% if state_attr('sensor.nzbgetvpn_status', 'system') and state_attr('sensor.nzbgetvpn_status', 'system').load_average %}
+            {{ state_attr('sensor.nzbgetvpn_status', 'system').load_average['1min'] | round(2) }}
+          {% else %}
+            unknown
+          {% endif %}
+        icon_template: mdi:speedometer
+      
+      nzbgetvpn_uptime:
+        friendly_name: "Container Uptime"
+        value_template: >
+          {% if state_attr('sensor.nzbgetvpn_status', 'uptime') %}
+            {{ state_attr('sensor.nzbgetvpn_status', 'uptime').human | default('unknown') }}
+          {% else %}
+            unknown
+          {% endif %}
+        icon_template: mdi:clock-outline
+
+# Binary sensors for health checks (true/false states)
+binary_sensor:
+  - platform: template
+    sensors:
+      nzbgetvpn_healthy:
+        friendly_name: "nzbgetvpn Healthy"
+        value_template: "{{ states('sensor.nzbgetvpn_health') == 'healthy' }}"
+        icon_template: >
+          {% if states('sensor.nzbgetvpn_health') == 'healthy' %}
+            mdi:shield-check
+          {% else %}
+            mdi:shield-alert
+          {% endif %}
+        device_class: connectivity
+      
+      nzbgetvpn_nzbget_ok:
+        friendly_name: "NZBGet OK"
+        value_template: "{{ states('sensor.nzbgetvpn_nzbget_status') == 'success' }}"
+        icon_template: >
+          {% if states('sensor.nzbgetvpn_nzbget_status') == 'success' %}
+            mdi:download
+          {% else %}
+            mdi:download-off
+          {% endif %}
+        device_class: connectivity
+      
+      nzbgetvpn_vpn_ok:
+        friendly_name: "VPN OK"
+        value_template: "{{ states('sensor.nzbgetvpn_vpn_interface') == 'up' }}"
+        icon_template: >
+          {% if states('sensor.nzbgetvpn_vpn_interface') == 'up' %}
+            mdi:vpn
+          {% else %}
+            mdi:vpn-off
+          {% endif %}
+        device_class: connectivity
+
+# Automations for notifications (optional)
+automation:
+  - alias: "nzbgetvpn Health Alert"
+    trigger:
+      - platform: state
+        entity_id: sensor.nzbgetvpn_health
+        to: 'unhealthy'
+        for: '00:02:00'  # Alert after 2 minutes of unhealthy state
+    action:
+      - service: notify.mobile_app_your_phone  # Replace with your notification service
+        data:
+          title: "🚨 nzbgetvpn Alert"
+          message: >
+            nzbgetvpn container is unhealthy!
+            Exit code: {{ state_attr('sensor.nzbgetvpn_health', 'exit_code') }}
+            External IP: {{ state_attr('sensor.nzbgetvpn_health', 'external_ip') }}
+          data:
+            priority: high
+            tag: nzbgetvpn_health
+  
+  - alias: "nzbgetvpn VPN Disconnected"
+    trigger:
+      - platform: state
+        entity_id: sensor.nzbgetvpn_vpn_interface
+        to: 'down'
+        for: '00:01:00'  # Alert after 1 minute
+    action:
+      - service: notify.mobile_app_your_phone  # Replace with your notification service
+        data:
+          title: "⚠️ VPN Disconnected"
+          message: "nzbgetvpn VPN interface is down!"
+          data:
+            priority: high
+            tag: nzbgetvpn_vpn
+  
+  - alias: "nzbgetvpn IP Leak Detected"
+    trigger:
+      - platform: state
+        entity_id: sensor.nzbgetvpn_ip_leak
+        to: 'changed'
+    action:
+      - service: notify.mobile_app_your_phone  # Replace with your notification service
+        data:
+          title: "🔴 IP Leak Alert"
+          message: >
+            External IP changed! Possible VPN leak detected.
+            New IP: {{ state_attr('sensor.nzbgetvpn_health', 'external_ip') }}
+          data:
+            priority: critical
+            tag: nzbgetvpn_leak 
