@@ -2,6 +2,38 @@
 
 All notable changes to nzbgetvpn will be documented in this file.
 
+## [v25.0.33] - 2025-01-27
+
+### 🧹 Repository Consolidation & Cleanup
+- **Eliminated Documentation Redundancy**: Removed redundant `MONITORING.md` from root
+  - Consolidated monitoring documentation into comprehensive guide
+  - Updated all references to point to `monitoring/docs/MONITORING_SETUP.md`
+  - Streamlined documentation hierarchy for better user experience
+
+### 🗂️ File Structure Optimization
+- **Removed System Files**: Cleaned up `.DS_Store` files and improved `.gitignore`
+  - Added macOS system files, Thumbs.db, and other OS artifacts to `.gitignore`
+  - Removed committed system files from repository
+- **Removed Unused Development Data**: Cleaned up `test_data/` directory
+  - Removed leftover development artifacts not referenced anywhere
+  - Reduced repository size and complexity
+
+### 📚 Enhanced Documentation Structure
+- **Streamlined Monitoring Guides**: Improved documentation hierarchy
+  - `monitoring/README.md` - Quick start and overview
+  - `monitoring/docs/MONITORING_SETUP.md` - Comprehensive setup guide
+  - Fixed all broken references and links across documentation
+- **Improved User Experience**: Clearer paths for both simple and advanced deployments
+  - Fast deployment: `docker-compose up -d` or `make run`
+  - Advanced monitoring: Complete guide in monitoring directory
+  - Preserved all customization options for power users
+
+### 🎯 Repository Goals Achieved
+- **Single Container Focus**: Maintained unified Docker container approach
+- **Simple Deployment**: Quick start options preserved and improved
+- **Advanced Customization**: All configuration options and monitoring stacks retained
+- **Clean Structure**: Eliminated redundancy while preserving functionality
+
 ## [v25.0.32] - 2025-01-27
 
 ### 🎨 Beautiful Monitoring Dashboard Overhaul

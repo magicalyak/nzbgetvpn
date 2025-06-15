@@ -269,7 +269,7 @@ docker run -d \
 2. Add device mapping: `devices: - /dev/net/tun`
 3. Enable monitoring: `ENABLE_MONITORING=yes`
 
-See [MONITORING.md](MONITORING.md) for complete setup guide.
+See [monitoring/docs/MONITORING_SETUP.md](monitoring/docs/MONITORING_SETUP.md) for complete setup guide.
 ```
 
 ### 7. Post-Release Tasks
@@ -307,5 +307,5 @@ sed -i 's/:fixed/:latest/g' docker-compose.yml
 
 For issues with the fixed version:
 1. Check [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
-2. Review [MONITORING.md](MONITORING.md) 
+2. Review [monitoring/docs/MONITORING_SETUP.md](monitoring/docs/MONITORING_SETUP.md) 
 3. Open issue with "fixed-version" label 

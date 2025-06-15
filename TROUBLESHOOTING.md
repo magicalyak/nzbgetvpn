@@ -838,4 +838,4 @@ time docker run --rm --platform linux/amd64 magicalyak/nzbgetvpn:latest python3 
 For more help, visit our [GitHub repository](https://github.com/magicalyak/nzbgetvpn) or check the:
 - **[README](README.md)** for general usage
 - **[MULTI-ARCH.md](MULTI-ARCH.md)** for detailed platform guides  
-- **[MONITORING.md](MONITORING.md)** for monitoring setup 
+- **[Monitoring Setup Guide](monitoring/docs/MONITORING_SETUP.md)** for comprehensive monitoring setup 

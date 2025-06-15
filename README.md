@@ -407,7 +407,7 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=admin
 ```
 
-**👉 Complete monitoring guide:** [MONITORING.md](MONITORING.md)
+**👉 Complete monitoring guide:** [monitoring/docs/MONITORING_SETUP.md](monitoring/docs/MONITORING_SETUP.md)
 
 ## 🔧 Enhanced Monitoring & Auto-Restart
 
