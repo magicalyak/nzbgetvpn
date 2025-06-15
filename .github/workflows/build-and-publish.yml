@@ -101,6 +101,9 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
+            type=semver,pattern=v{{version}}
+            type=semver,pattern=v{{major}}.{{minor}}
+            type=semver,pattern=v{{major}}
             type=raw,value=latest,enable={{is_default_branch}}
             type=raw,value=stable,enable=${{ github.ref == 'refs/heads/main' }}
             type=schedule,pattern={{date 'YYYYMMDD'}}
@@ -216,6 +219,9 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
+            type=semver,pattern=v{{version}}
+            type=semver,pattern=v{{major}}.{{minor}}
+            type=semver,pattern=v{{major}}
             type=raw,value=latest,enable={{is_default_branch}}
             type=raw,value=stable,enable=${{ github.ref == 'refs/heads/main' }}
             type=schedule,pattern={{date 'YYYYMMDD'}}
@@ -303,6 +309,9 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
+            type=semver,pattern=v{{version}}
+            type=semver,pattern=v{{major}}.{{minor}}
+            type=semver,pattern=v{{major}}
             type=raw,value=latest,enable={{is_default_branch}}
             type=raw,value=stable,enable=${{ github.ref == 'refs/heads/main' }}
             type=schedule,pattern={{date 'YYYYMMDD'}}
@@ -361,6 +370,9 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
+            type=semver,pattern=v{{version}}
+            type=semver,pattern=v{{major}}.{{minor}}
+            type=semver,pattern=v{{major}}
             type=raw,value=latest,enable={{is_default_branch}}
             type=raw,value=stable,enable=${{ github.ref == 'refs/heads/main' }}
             type=schedule,pattern={{date 'YYYYMMDD'}}
