@@ -2,6 +2,29 @@
 
 All notable changes to nzbgetvpn will be documented in this file.
 
+## [v25.0.31] - 2025-01-27
+
+### 🚀 Docker Hub & CI/CD Improvements
+- **Enhanced GitHub Actions Workflows**: Comprehensive Docker Hub tagging strategy
+  - Added `stable` tag for production deployments
+  - Added date-based tags (`YYYYMMDD`) for scheduled builds  
+  - Added SHA-based tags (`main-<sha>`) for traceability
+  - Improved OCI labels with source, documentation, and version info
+- **New Release Candidate Workflow**: Build and test RC images before releases
+- **Scheduled Builds**: Daily builds at 2 AM UTC for security patches
+- **Tag Validation Workflow**: Validate tagging strategy without building images
+- **Multi-Registry Support**: Enhanced support for Docker Hub + GitHub Container Registry
+
+### 📚 Documentation Updates
+- **Docker Hub Improvements Guide**: Comprehensive documentation of new tagging strategy
+- **Updated Tag Matrix**: Clear documentation of all available tags and when they're created
+- **Improved Workflow Documentation**: Better error handling and debugging information
+
+### 🔧 Technical Enhancements
+- **Better Error Handling**: Enhanced credential validation in workflows
+- **Improved Conditional Logic**: Optimized builds for different trigger types
+- **Enhanced Metadata**: More comprehensive OCI image labels
+
 ## [v25.0.30] - 2025-06-15
 
 ### 📖 Documentation
