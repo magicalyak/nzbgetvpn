@@ -259,6 +259,35 @@ jobs:
           docker buildx imagetools create $(jq -cr '.tags | map(select(contains("docker.io")) | "-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             $(printf '${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
 
+      - name: Create additional version tags for semver
+        if: startsWith(github.ref, 'refs/tags/v')
+        working-directory: /tmp/digests
+        run: |
+          # Extract version from tag (remove 'v' prefix)
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "Creating additional version tags for: $VERSION"
+          
+          # Create version tags manually
+          DIGESTS=$(printf '${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
+          
+          # Full version tag (e.g., v25.0.34)
+          docker buildx imagetools create -t ${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }}:v${VERSION} $DIGESTS
+          
+          # Version without v prefix (e.g., 25.0.34)  
+          docker buildx imagetools create -t ${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }}:${VERSION} $DIGESTS
+          
+          # Major.minor version (e.g., 25.0)
+          MAJOR_MINOR=$(echo $VERSION | cut -d. -f1-2)
+          docker buildx imagetools create -t ${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }}:${MAJOR_MINOR} $DIGESTS
+          docker buildx imagetools create -t ${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }}:v${MAJOR_MINOR} $DIGESTS
+          
+          # Major version (e.g., 25)
+          MAJOR=$(echo $VERSION | cut -d. -f1)
+          docker buildx imagetools create -t ${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }}:${MAJOR} $DIGESTS
+          docker buildx imagetools create -t ${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }}:v${MAJOR} $DIGESTS
+          
+          echo "✅ Created version tags: v${VERSION}, ${VERSION}, ${MAJOR_MINOR}, v${MAJOR_MINOR}, ${MAJOR}, v${MAJOR}"
+
       - name: Create manifest list and push to GHCR
         working-directory: /tmp/digests
         run: |
