@@ -43,6 +43,25 @@ Download your VPN configuration file from your provider and place it in `~/nzbge
 - [Surfshark configs](https://support.surfshark.com/hc/en-us/articles/360011051133)
 - Most providers offer OpenVPN config downloads
 
+**🔐 VPN Credentials (OpenVPN only):**
+
+You have two options for providing VPN credentials:
+
+**Option 1: Environment Variables** (quick setup)
+```bash
+-e VPN_USER=your_vpn_username \
+-e VPN_PASS=your_vpn_password \
+```
+
+**Option 2: Credentials File** (more secure, recommended)
+```bash
+# Create credentials file (more secure than environment variables)
+echo "your_vpn_username" > ~/nzbgetvpn/config/openvpn/credentials.txt
+echo "your_vpn_password" >> ~/nzbgetvpn/config/openvpn/credentials.txt
+
+# Don't set VPN_USER/VPN_PASS when using file method
+```
+
 ### 3. Run the Container
 
 **Basic OpenVPN example:**

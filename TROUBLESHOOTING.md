@@ -43,12 +43,16 @@ docker exec nzbgetvpn ip addr show
 
 2. **Verify credentials (OpenVPN):**
    ```bash
-   # Check if credentials file exists (if using file method)
+   # Method 1: Check credentials file (recommended)
    docker exec nzbgetvpn cat /config/openvpn/credentials.txt
    
-   # Or verify environment variables are set
+   # Method 2: Check environment variables
    docker exec nzbgetvpn env | grep VPN_
    ```
+   
+   **Note:** The container looks for credentials in this priority order:
+   1. `VPN_USER` and `VPN_PASS` environment variables
+   2. `/config/openvpn/credentials.txt` file (username on line 1, password on line 2)
 
 3. **Enable debug logging:**
    ```ini

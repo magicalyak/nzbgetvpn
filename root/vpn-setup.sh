@@ -63,9 +63,15 @@ find_vpn_credentials() {
     fi
   fi
 
-  # Priority 2: Fixed credentials file path /config/openvpn/credentials.txt
-  FIXED_CRED_PATH="/config/openvpn/credentials.txt"
-  if [ -f "$FIXED_CRED_PATH" ] && [ -r "$FIXED_CRED_PATH" ]; then
+  # Priority 2: Check for credentials file (try both common names)
+  for CRED_FILE in "/config/openvpn/credentials.txt" "/config/openvpn/credentials.conf"; do
+    if [ -f "$CRED_FILE" ] && [ -r "$CRED_FILE" ]; then
+      FIXED_CRED_PATH="$CRED_FILE"
+      break
+    fi
+  done
+  
+  if [ -n "$FIXED_CRED_PATH" ]; then
     echo "[INFO] Checking for credentials file at fixed path: $FIXED_CRED_PATH"
     # Ensure the file is not empty and has at least two lines (user & pass)
     if [ -s "$FIXED_CRED_PATH" ] && [ "$(wc -l < "$FIXED_CRED_PATH")" -ge 2 ]; then
@@ -83,11 +89,11 @@ find_vpn_credentials() {
       echo "[WARN] Credentials file $FIXED_CRED_PATH was found but is empty or does not contain at least two lines. Ignoring."
     fi
   else
-    echo "[INFO] No credentials file found at $FIXED_CRED_PATH (this is okay if using VPN_USER/PASS or if your VPN config doesn't need separate auth)."
+    echo "[INFO] No credentials file found at /config/openvpn/credentials.txt or /config/openvpn/credentials.conf (this is okay if using VPN_USER/PASS or if your VPN config doesn't need separate auth)."
   fi
   
   # If neither method yielded credentials
-  echo "[WARN] No valid VPN credentials provided via VPN_USER/VPN_PASS or at $FIXED_CRED_PATH."
+  echo "[WARN] No valid VPN credentials provided via VPN_USER/VPN_PASS or credentials file."
   echo "[INFO] If your OpenVPN configuration requires username/password authentication and doesn't embed them, connection may fail."
   return 1 
 }

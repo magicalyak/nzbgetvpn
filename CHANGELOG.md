@@ -1,5 +1,22 @@
 # Changelog
 
+All notable changes to nzbgetvpn will be documented in this file.
+
+## [v25.0.30] - 2025-06-15
+
+### 📖 Documentation
+- **CRITICAL FIX**: Updated documentation to clarify VPN credentials file naming
+  - Container expects `/config/openvpn/credentials.txt` (not `.conf`)
+  - Added credentials file vs environment variable options to README.md
+  - Updated .env.sample with both authentication methods
+  - Fixed TROUBLESHOOTING.md examples to use correct filename
+- **Security Enhancement**: Documented credentials file as recommended method over environment variables
+
+### 🔧 Background
+- Discovered inconsistency between container code (expects `credentials.txt`) and user configurations (often used `credentials.conf`)
+- This caused VPN authentication failures that were difficult to diagnose
+- Container will now work with either filename for backward compatibility
+
 ## [v25.0.29] - 2025-01-19
 
 ### Fixed ✅
