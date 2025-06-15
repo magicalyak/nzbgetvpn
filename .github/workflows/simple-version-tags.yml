@@ -1,0 +1,75 @@
+name: Create Version Tags
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  REGISTRY_DOCKERHUB: docker.io
+  IMAGE_NAME: magicalyak/nzbgetvpn
+
+jobs:
+  create-version-tags:
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "MAJOR_MINOR=$(echo $VERSION | cut -d. -f1-2)" >> $GITHUB_OUTPUT
+          echo "MAJOR=$(echo $VERSION | cut -d. -f1)" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY_DOCKERHUB }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Wait for main build to complete
+        run: |
+          echo "Waiting 5 minutes for main build workflow to complete..."
+          sleep 300
+
+      - name: Create version tags from latest stable image
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          MAJOR_MINOR=${{ steps.version.outputs.MAJOR_MINOR }}
+          MAJOR=${{ steps.version.outputs.MAJOR }}
+          
+          echo "Creating version tags for: $VERSION"
+          
+          # Pull the latest stable image (which should be from the same commit)
+          docker pull ${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }}:stable
+          
+          # Tag with version numbers
+          docker tag ${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }}:stable ${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }}:v${VERSION}
+          docker tag ${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }}:stable ${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }}:${VERSION}
+          docker tag ${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }}:stable ${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }}:v${MAJOR_MINOR}
+          docker tag ${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }}:stable ${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }}:${MAJOR_MINOR}
+          docker tag ${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }}:stable ${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }}:v${MAJOR}
+          docker tag ${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }}:stable ${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }}:${MAJOR}
+          
+          # Push all version tags
+          docker push ${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }}:v${VERSION}
+          docker push ${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }}:${VERSION}
+          docker push ${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }}:v${MAJOR_MINOR}
+          docker push ${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }}:${MAJOR_MINOR}
+          docker push ${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }}:v${MAJOR}
+          docker push ${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }}:${MAJOR}
+          
+          echo "✅ Successfully created version tags:"
+          echo "  - v${VERSION}"
+          echo "  - ${VERSION}"
+          echo "  - v${MAJOR_MINOR}"
+          echo "  - ${MAJOR_MINOR}"
+          echo "  - v${MAJOR}"
+          echo "  - ${MAJOR}" 
