@@ -2,7 +2,7 @@
 set -e
 
 # Configuration
-VERSION="v25.0.29"
+VERSION="v25.0.30"
 IMAGE_NAME="magicalyak/nzbgetvpn"
 BRANCH="main"
 
@@ -70,53 +70,53 @@ echo -e "${YELLOW}🏷️  Creating Git tag...${NC}"
 if [[ -n $(git status --porcelain) ]]; then
     echo -e "${BLUE}📝 Committing changes...${NC}"
     git add .
-    git commit -m "fix: Release ${VERSION} - BusyBox compatibility and monitoring improvements
+    git commit -m "docs: Release ${VERSION} - VPN credentials documentation fixes
 
-- Fixed BusyBox grep compatibility issues in health check script
-- Enhanced Prometheus monitoring with comprehensive metrics
-- Added proper device mapping for VPN functionality
-- Improved documentation with monitoring guides
-- Updated Docker Compose with required configurations
+- Fixed critical VPN credentials file naming inconsistency
+- Container now accepts both credentials.txt and credentials.conf
+- Added security guidance for file-based vs environment variable auth
+- Enhanced troubleshooting documentation with correct examples
+- Updated .env.sample with both authentication methods
 
-Fixes issues with health checks showing 'unknown' status
-Resolves VPN connectivity problems on various platforms"
+Prevents VPN authentication failures from inconsistent documentation"
 fi
 
 # Create and push tag
 echo -e "${BLUE}🏷️  Creating tag ${VERSION}...${NC}"
 git tag -a "${VERSION}" -m "Release ${VERSION}
 
-## 🎉 nzbgetvpn ${VERSION} - BusyBox Compatibility & Monitoring Improvements
+## 🎉 nzbgetvpn ${VERSION} - VPN Credentials Documentation Fixes
 
-### 🐛 Bug Fixes
-- **BusyBox grep compatibility** - Health checks now work on all Linux distributions
-- **VPN interface detection** - Proper IP address extraction across platforms  
-- **Device mapping** - Fixed /dev/net/tun configuration issues
+### 📖 Documentation Improvements
+- **CRITICAL FIX**: Fixed VPN credentials file naming inconsistency
+- **Backward Compatibility**: Container now accepts both credentials.txt and credentials.conf
+- **Security Enhancement**: Added guidance on file-based vs environment variable authentication
+- **Better Examples**: Updated troubleshooting with correct authentication methods
+- **Complete Guide**: Enhanced .env.sample with both authentication options
 
-### ✨ Improvements
-- **Enhanced Prometheus integration** - Complete monitoring with /prometheus endpoint
-- **Better health endpoints** - /health, /prometheus, /status, /metrics
-- **Updated documentation** - Complete monitoring and setup guides
-- **Improved Docker Compose** - Includes all required configurations
+### 🔧 Code Improvements  
+- **Flexible Authentication**: Enhanced vpn-setup.sh to handle multiple credential file formats
+- **Better Error Messages**: Clearer guidance when credentials are missing
+- **Improved Debugging**: More informative logs for authentication issues
 
-### 📊 Monitoring
-- Health: http://localhost:8080/health
-- Prometheus: http://localhost:8080/prometheus
-- Status: http://localhost:8080/status
+### 🚨 What This Fixes
+This release prevents VPN authentication failures that occurred when users:
+- Created credentials files with different naming conventions
+- Followed inconsistent documentation about authentication methods
+- Encountered confusing error messages during troubleshooting
 
-### 🔧 Migration
-\`\`\`yaml
-# docker-compose.yml
-services:
-  nzbgetvpn:
-    image: ${IMAGE_NAME}:${VERSION}
-    devices:
-      - /dev/net/tun  # Required!
-    ports:
-      - \"8080:8080\"  # Monitoring
+### 📝 Authentication Methods
+\`\`\`bash
+# Method 1: Environment variables (less secure)
+VPN_USER=your_username
+VPN_PASS=your_password
+
+# Method 2: Credentials file (recommended)
+echo \"your_username\" > ~/nzbgetvpn/config/openvpn/credentials.txt
+echo \"your_password\" >> ~/nzbgetvpn/config/openvpn/credentials.txt
 \`\`\`
 
-See MONITORING.md for complete setup guide."
+See updated README.md and TROUBLESHOOTING.md for complete setup guides."
 
 echo -e "${GREEN}✅ Git tag created successfully${NC}"
 echo ""
