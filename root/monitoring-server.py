@@ -427,7 +427,14 @@ class MonitoringHandler(BaseHTTPRequestHandler):
                 # Individual check metrics
                 checks = status_data.get('checks', {})
                 for check_name, check_status in checks.items():
-                    check_value = 1 if check_status in ['success', 'up'] else 0
+                    # Map text values to numeric values correctly
+                    if check_status in ['success', 'up', 'stable']:
+                        check_value = 1
+                    elif check_status in ['failed', 'down', 'changed', 'unknown']:
+                        check_value = 0
+                    else:
+                        # Default to 0 for any other values
+                        check_value = 0
                     metrics_lines.append(f'nzbgetvpn_check{{check="{check_name}"}} {check_value}')
             
             # Add system metrics
