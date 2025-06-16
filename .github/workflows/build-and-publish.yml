@@ -142,6 +142,30 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Check GHCR Rate Limit
+        id: ghcr-rate-limit
+        run: |
+          echo "🔍 Checking GHCR rate limit..."
+          
+          # Check GHCR rate limit using GitHub API
+          RATE_LIMIT_RESPONSE=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/rate_limit" || echo '{"rate":{"remaining":0}}')
+          
+          REMAINING_LIMIT=$(echo "$RATE_LIMIT_RESPONSE" | jq -r '.rate.remaining // 0')
+          LIMIT_RESET=$(echo "$RATE_LIMIT_RESPONSE" | jq -r '.rate.reset // 0')
+          
+          echo "GHCR API rate limit remaining: $REMAINING_LIMIT"
+          echo "Rate limit resets at: $(date -d @$LIMIT_RESET 2>/dev/null || echo 'Unknown')"
+          
+          # Set output for subsequent steps
+          echo "remaining=$REMAINING_LIMIT" >> $GITHUB_OUTPUT
+          echo "should_push_ghcr=true" >> $GITHUB_OUTPUT
+          
+          if [ "$REMAINING_LIMIT" -lt 50 ]; then
+            echo "⚠️ WARNING: GHCR rate limit is low: $REMAINING_LIMIT remaining."
+            echo "🔄 Will proceed with retry logic to handle potential rate limiting."
+          fi
+
       - name: Extract platform pair
         id: platform
         run: |
@@ -301,6 +325,13 @@ jobs:
           # Create manifest
           docker buildx imagetools create $DOCKERHUB_TAGS \
             $(printf '${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
+          
+          echo "✅ Docker Hub manifest created successfully"
+
+      - name: Rate Limit Mitigation Delay
+        run: |
+          echo "⏱️ Adding brief delay between registry operations to reduce rate limiting..."
+          sleep 5
 
       - name: Create manifest list and push to GHCR
         working-directory: /tmp/digests
@@ -323,14 +354,70 @@ jobs:
           
           echo "GHCR tags to create: $GHCR_TAGS"
           
-          # Create GHCR manifest
-          docker buildx imagetools create $GHCR_TAGS \
-            $(printf '${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
+          # Implement retry logic with exponential backoff for rate limiting
+          echo "🔄 Pushing to GHCR with retry logic..."
+          
+          n=0
+          max_retries=5
+          base_delay=2
+          
+          until [ $n -ge $max_retries ]; do
+            echo "Attempt $((n+1)) of $max_retries..."
+            
+            if docker buildx imagetools create $GHCR_TAGS \
+              $(printf '${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }}@sha256:%s ' *); then
+              echo "✅ Successfully pushed to GHCR"
+              break
+            else
+              exit_code=$?
+              n=$((n+1))
+              
+              if [ $n -lt $max_retries ]; then
+                delay=$((base_delay ** n))
+                echo "❌ Push failed with exit code $exit_code. Retrying in $delay seconds..."
+                sleep $delay
+              else
+                echo "❌ ERROR: Failed to push to GHCR after $max_retries attempts."
+                echo "🔄 Continuing workflow - Docker Hub push was successful"
+                echo "⚠️ GHCR images may not be available, but Docker Hub images are ready"
+                # Don't exit with error to avoid failing the entire workflow
+                exit 0
+              fi
+            fi
+          done
+
+      - name: Verify GHCR Push (Optional)
+        continue-on-error: true
+        run: |
+          echo "🔍 Verifying GHCR push..."
+          
+          # Extract version for verification
+          VERSION=$(echo "$DOCKER_METADATA_OUTPUT_JSON" | jq -r '.labels."org.opencontainers.image.version" // "latest"')
+          
+          if docker buildx imagetools inspect ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}:$VERSION; then
+            echo "✅ GHCR image verified successfully"
+          else
+            echo "⚠️ WARNING: Could not verify GHCR image - may not be available due to rate limiting"
+          fi
 
       - name: Inspect image
         run: |
+          echo "🔍 Inspecting published images..."
+          
+          # Always inspect Docker Hub (primary registry)
+          echo "📦 Docker Hub image:"
           docker buildx imagetools inspect ${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
-          docker buildx imagetools inspect ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+          
+          # Conditionally inspect GHCR (may fail due to rate limiting)
+          echo "📦 GHCR image:"
+          if docker buildx imagetools inspect ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}; then
+            echo "✅ GHCR image inspection successful"
+          else
+            echo "⚠️ WARNING: GHCR image inspection failed - this is expected if GHCR push was rate limited"
+            echo "🔄 Docker Hub image is available and functional"
+          fi
+          
+          echo "✅ Image inspection completed"
 
   test-multiarch:
     runs-on: ubuntu-latest

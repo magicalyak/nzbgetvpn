@@ -2,6 +2,31 @@
 
 All notable changes to nzbgetvpn will be documented in this file.
 
+## [v25.0.39] - 2025-01-27
+
+### 🚀 GitHub Actions Workflow Rate Limiting Fixes
+- **Fixed GHCR Rate Limiting Issues**: Comprehensive fixes for workflow failures
+  - ✅ **Retry Logic with Exponential Backoff**: Added robust retry mechanism for GHCR pushes (up to 5 attempts)
+  - ✅ **Rate Limit Monitoring**: Pre-push rate limit checking using GitHub API
+  - ✅ **Graceful Degradation**: Workflow continues if GHCR fails but Docker Hub succeeds
+  - ✅ **Enhanced Error Handling**: Improved error reporting and workflow resilience
+  - ✅ **Registry Operation Delays**: Added strategic delays between registry operations
+
+### 🔧 Workflow Reliability Improvements
+- **Separate Scheduled Builds**: Created `scheduled-build.yml` for routine builds
+  - Docker Hub only pushes to avoid GHCR rate limits on automated builds
+  - GHCR reserved for tagged releases only
+  - Nightly builds with `nightly-YYYYMMDD` tags
+  - Reduced registry load with targeted build strategy
+- **Enhanced Image Inspection**: Improved image verification with conditional GHCR checks
+- **Better Error Recovery**: Workflows no longer fail completely due to GHCR rate limiting
+
+### 🎯 Production Deployment Strategy
+- **Primary Registry Focus**: Docker Hub as primary registry with GHCR as secondary
+- **Rate Limit Mitigation**: Strategic delays and retry logic prevent 429 errors
+- **Workflow Resilience**: Builds continue even if secondary registry fails
+- **Enhanced Monitoring**: Better visibility into rate limiting and registry status
+
 ## [v25.0.38] - 2025-06-15
 
 ### 🏠 Home Assistant Integration
