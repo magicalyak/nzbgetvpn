@@ -23,5 +23,8 @@ export MONITORING_LOG_LEVEL="${MONITORING_LOG_LEVEL:-INFO}"
 
 echo "Starting nzbgetvpn monitoring server on port ${MONITORING_PORT}"
 
+# Add system Python site-packages to path for Alpine packages
+export PYTHONPATH="/usr/lib/python3.12/site-packages:${PYTHONPATH}"
+
 # Run the monitoring server
 exec python3 /root/monitoring-server.py 
