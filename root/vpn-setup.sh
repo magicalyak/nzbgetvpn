@@ -478,10 +478,11 @@ if [ "${VPN_CLIENT,,}" = "openvpn" ]; then
         VPN_SERVER_IP="$VPN_SERVER_HOST"
       else
         echo "[INFO] Resolving VPN server hostname: $VPN_SERVER_HOST"
-        VPN_SERVER_IP=$(nslookup "$VPN_SERVER_HOST" | awk '/^Address: / { print $2 }' | head -1)
+        # Filter out invalid IPv6 addresses like "::" and only get valid IPv4 addresses
+        VPN_SERVER_IP=$(nslookup "$VPN_SERVER_HOST" | awk '/^Address: / { print $2 }' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
         if [ -z "$VPN_SERVER_IP" ]; then
-          # Fallback to getent hosts
-          VPN_SERVER_IP=$(getent hosts "$VPN_SERVER_HOST" | awk '{print $1}' | head -1)
+          # Fallback to getent hosts, also filtering for IPv4
+          VPN_SERVER_IP=$(getent hosts "$VPN_SERVER_HOST" | awk '{print $1}' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
         fi
       fi
       
