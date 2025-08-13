@@ -76,6 +76,7 @@ RUN apk add --no-cache \
     wireguard-tools \
     privoxy \
     python3 \
+    py3-psutil \
     jq \
     bc \
     && for f in /etc/privoxy/*.new; do mv -n "$f" "${f%.new}"; done
