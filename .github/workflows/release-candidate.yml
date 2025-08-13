@@ -29,7 +29,7 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Validate Docker Hub credentials
         id: validate-creds
@@ -95,7 +95,7 @@ jobs:
 
       - name: Build Release Candidate
         id: build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
