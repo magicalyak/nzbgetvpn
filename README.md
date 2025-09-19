@@ -8,7 +8,8 @@
 
 ## ✨ Key Features
 
-- 🔒 **Automatic VPN Protection** - All NZBGet traffic routed through your VPN
+- 🔒 **Enhanced VPN Kill Switch** - Strict firewall rules with DNS leak prevention
+- 🛡️ **Active VPN Monitoring** - Automatically stops NZBGet if VPN connection fails
 - 🌐 **VPN Protocol Support** - Both OpenVPN and WireGuard
 - 🏗️ **Multi-Platform** - Works on x86, ARM64 (Raspberry Pi, Apple Silicon)
 - ⚙️ **Auto-Configuration** - Set up your news server via environment variables
@@ -534,6 +535,13 @@ docker run -d \
 - `VPN_OPTIONS` - Additional VPN client options
 - `NAME_SERVERS` - Custom DNS servers
 
+**VPN Kill Switch & Security:**
+- `VPN_CHECK_INTERVAL` - Seconds between VPN health checks (default: 30)
+- `VPN_MAX_FAILURES` - Max consecutive failures before stopping NZBGet (default: 3)
+- `CHECK_DNS` - Enable DNS resolution testing (default: false)
+- `CHECK_EXTERNAL_IP` - Check external IP through VPN (default: false)
+- `AUTO_RESTART_VPN` - Auto-restart VPN on failure (default: false)
+
 **System Settings:**
 - `PUID` / `PGID` - User/Group IDs
 - `TZ` - Timezone
@@ -632,6 +640,11 @@ docker build -t my-nzbgetvpn .
 - Enable debug logging: `DEBUG=true`
 
 **👉 Full troubleshooting guide:** [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+
+## 🔒 Security Documentation
+
+- **[VPN Kill Switch Security](docs/VPN_KILLSWITCH_SECURITY.md)** - Enhanced security features and kill switch implementation
+- **[Docker Scout Improvements](docs/DOCKER_SCOUT_IMPROVEMENTS.md)** - Security hardening recommendations
 
 ## 🤝 Contributing & Support
 
