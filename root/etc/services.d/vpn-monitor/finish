@@ -1,0 +1,10 @@
+#!/command/with-contenv bash
+# s6 finish script for VPN monitor
+
+echo "[s6-vpn-monitor] VPN monitor service stopped"
+
+# If VPN monitor stopped, ensure NZBGet is also stopped for safety
+if pgrep -x "nzbget" > /dev/null; then
+    echo "[s6-vpn-monitor] Stopping NZBGet as VPN monitor has stopped"
+    s6-svc -d /var/run/s6/services/nzbget 2>/dev/null || true
+fi

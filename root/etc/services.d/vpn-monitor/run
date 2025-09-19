@@ -1,0 +1,16 @@
+#!/command/with-contenv bash
+# s6 service to run VPN monitor
+
+echo "[s6-vpn-monitor] Starting VPN monitor service..."
+
+# Wait for VPN to be established first
+while [ ! -f /tmp/vpn_setup_complete ]; do
+    echo "[s6-vpn-monitor] Waiting for VPN setup to complete..."
+    sleep 5
+done
+
+# Give VPN a moment to stabilize
+sleep 10
+
+# Execute the VPN monitor script
+exec /root/vpn-monitor.sh

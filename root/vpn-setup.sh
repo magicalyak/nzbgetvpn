@@ -359,11 +359,11 @@ iptables -t nat -F
 iptables -t mangle -F
 echo "[INFO] Flushed existing iptables rules."
 
-# Set default policies
+# Set default policies - STRICT DENY-ALL APPROACH
 iptables -P INPUT DROP
 iptables -P FORWARD DROP
-iptables -P OUTPUT ACCEPT # Allow outbound traffic by default, will be shaped by VPN
-echo "[INFO] Set default iptables policies (INPUT/FORWARD DROP, OUTPUT ACCEPT)."
+iptables -P OUTPUT DROP # DROP by default for strict killswitch
+echo "[INFO] Set strict default iptables policies (ALL chains set to DROP)."
 
 # Allow loopback traffic
 iptables -A INPUT -i lo -j ACCEPT
@@ -376,6 +376,14 @@ iptables -A OUTPUT -m state --state RELATED,ESTABLISHED -j ACCEPT
 # For FORWARD chain as well, if container were to act as a router for others (not typical for this use case but good practice)
 iptables -A FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
 echo "[INFO] Allowed established/related connections."
+
+# DNS LEAK PREVENTION - Block DNS on eth0, only allow through VPN
+echo "[INFO] Implementing DNS leak prevention..."
+iptables -A OUTPUT -o eth0 -p udp --dport 53 -j DROP
+iptables -A OUTPUT -o eth0 -p tcp --dport 53 -j DROP
+iptables -A OUTPUT -o "$VPN_INTERFACE" -p udp --dport 53 -j ACCEPT
+iptables -A OUTPUT -o "$VPN_INTERFACE" -p tcp --dport 53 -j ACCEPT
+echo "[INFO] DNS leak prevention rules applied - DNS only allowed through VPN"
 
 # Allow NZBGet UI access from host (Docker for Mac via 127.0.0.1 proxies to eth0 IP)
 iptables -A INPUT -i eth0 -p tcp --dport 6789 -j ACCEPT
@@ -449,7 +457,7 @@ if [ -n "$ADDITIONAL_PORTS" ]; then
   echo "[INFO] Processed ADDITIONAL_PORTS."
 fi
 
-# All other OUTPUT traffic must go through VPN interface or be dropped
+# All other OUTPUT traffic must go through VPN interface
 iptables -A OUTPUT -o "$VPN_INTERFACE" -j ACCEPT
 
 # CRITICAL FIX: Allow VPN server connectivity before applying kill switch
@@ -510,8 +518,10 @@ elif [ "${VPN_CLIENT,,}" = "wireguard" ]; then
   iptables -A OUTPUT -p udp --dport 51820 -j ACCEPT
 fi
 
+# STRICT KILLSWITCH - Log and drop any remaining eth0 traffic
+iptables -A OUTPUT -o eth0 -m limit --limit 1/min -j LOG --log-prefix "[KILLSWITCH-BLOCKED] " --log-level 4
 iptables -A OUTPUT -o eth0 -j DROP # Drop if trying to go out eth0 and not LAN/PBR
-echo "[INFO] Default OUTPUT traffic routed through $VPN_INTERFACE. Other outbound on eth0 (non-LAN, non-PBR) dropped."
+echo "[INFO] Strict killswitch active: All non-VPN traffic on eth0 will be dropped."
 
 # Privoxy: Apply firewall and PBR rules if enabled (s6 will start the service)
 if [ "${ENABLE_PRIVOXY,,}" = "yes" ] || [ "${ENABLE_PRIVOXY,,}" = "true" ]; then
@@ -529,6 +539,12 @@ if [ "${ENABLE_PRIVOXY,,}" = "yes" ] || [ "${ENABLE_PRIVOXY,,}" = "true" ]; then
   echo "[INFO] CONNMARK rules for Privoxy (port ${PRIVOXY_PORT:-8118}) applied."
 else
   echo "[INFO] Privoxy is disabled."
+fi
+
+# Execute enhanced killswitch script for additional protection
+if [ -f /root/vpn-killswitch.sh ]; then
+    echo "[INFO] Executing enhanced VPN killswitch script..."
+    /root/vpn-killswitch.sh || echo "[WARN] Killswitch script had warnings but continuing"
 fi
 
 # Create a flag file indicating VPN script completed successfully
