@@ -185,9 +185,14 @@ jobs:
           outputs: type=image,name=${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
           cache-from: type=gha,scope=${{ env.PLATFORM_PAIR }}
           cache-to: type=gha,mode=max,scope=${{ env.PLATFORM_PAIR }}
+          provenance: true
+          sbom: true
           build-args: |
             BUILDPLATFORM=${{ matrix.platform }}
             TARGETPLATFORM=${{ matrix.platform }}
+            BUILD_DATE=${{ steps.meta.outputs.created }}
+            VCS_REF=${{ github.sha }}
+            VERSION=${{ steps.meta.outputs.version }}
 
       - name: Export digest
         run: |
