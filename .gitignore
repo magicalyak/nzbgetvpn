@@ -73,3 +73,6 @@ temp/
 scripts/local-*
 scripts/*.local
 config.local.*
+
+# Claude Code configuration
+CLAUDE.md
