@@ -1,1 +1,0 @@
-- This is a repo for nzbget using a vpn in a docker container.  I am running this locally on rocky.gamull.com as a systemctl service called nzbget /etc/systemd/system/nzbget.service that calls a script  /opt/containerd/start-nzbget-wrapper.sh  and env /opt/containerd/env/nzbget.env and mount file /opt/containerd/mounts/nzbget.mounts
