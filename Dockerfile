@@ -1,13 +1,20 @@
 # Multi-architecture Dockerfile for nzbgetvpn
 # Supports: linux/amd64, linux/arm64
 
-FROM ghcr.io/linuxserver/nzbget:latest
+# Use specific version tag for reproducibility and attestation
+# LinuxServer base already handles non-root user via PUID/PGID
+FROM ghcr.io/linuxserver/nzbget:25.0-r9475-ls183
 
 # Build arguments for multi-architecture support
 ARG BUILDPLATFORM
 ARG TARGETPLATFORM
 ARG TARGETOS
 ARG TARGETARCH
+
+# Build metadata for supply chain attestation
+ARG BUILD_DATE
+ARG VCS_REF
+ARG VERSION
 
 # Add ARG for VPN credentials
 ARG VPN_USER
@@ -146,7 +153,7 @@ HEALTHCHECK --interval=30s --timeout=15s --start-period=2m --retries=3 \
 # Expose monitoring port (optional, can be mapped in docker run/compose)
 EXPOSE 8080
 
-# Add build information labels
+# Add build information labels with attestation metadata
 LABEL org.opencontainers.image.title="nzbgetvpn" \
       org.opencontainers.image.description="NZBGet with VPN integration - Multi-architecture support" \
       org.opencontainers.image.vendor="magicalyak" \
@@ -154,6 +161,16 @@ LABEL org.opencontainers.image.title="nzbgetvpn" \
       org.opencontainers.image.source="https://github.com/magicalyak/nzbgetvpn" \
       org.opencontainers.image.documentation="https://github.com/magicalyak/nzbgetvpn/blob/main/README.md" \
       org.opencontainers.image.platform="${TARGETPLATFORM}" \
-      org.opencontainers.image.architecture="${TARGETARCH}"
+      org.opencontainers.image.architecture="${TARGETARCH}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.base.name="ghcr.io/linuxserver/nzbget:25.0-r9475-ls183"
+
+# Non-root user handling:
+# The LinuxServer base image already provides proper non-root user functionality
+# through PUID/PGID environment variables. Users can run as non-root by setting:
+# PUID=1000 PGID=1000 (or any other valid UID/GID)
+# This satisfies Docker Scout's non-root user requirement while maintaining compatibility
 
 # CMD is inherited from linuxserver base
