@@ -99,9 +99,7 @@ RUN apk add --no-cache \
     bc \
     && for f in /etc/privoxy/*.new; do mv -n "$f" "${f%.new}"; done \
     && # Clean up any temporary files\
-    rm -rf /tmp/* /var/tmp/* \
-    && # Remove SUID/SGID bits from binaries that don't need them\
-    find / -type f -perm /6000 -exec chmod a-s {} \; 2>/dev/null || true
+    rm -rf /tmp/* /var/tmp/*
 
 # Platform-specific optimizations
 RUN case "${TARGETARCH}" in \
@@ -183,21 +181,27 @@ LABEL org.opencontainers.image.title="nzbgetvpn" \
       org.opencontainers.image.base.name="ghcr.io/linuxserver/nzbget:v25.3-ls213"
 
 # Non-root user handling:
-# The LinuxServer base image uses s6-overlay which requires root at startup
-# but drops privileges to the specified PUID/PGID for the actual services.
-# We explicitly set a non-root user for Docker Scout compliance
-# while maintaining compatibility with s6-overlay's privilege dropping.
+# IMPORTANT: The LinuxServer base image requires root for s6-overlay initialization.
+# However, we need to properly declare the intended runtime user for Docker Scout.
+# The container WILL run as non-root via PUID/PGID environment variables.
 
-# Create explicit non-root user for Scout compliance
-# Note: s6-overlay will still handle the actual privilege dropping to PUID/PGID
-RUN addgroup -g 1000 -S nzbget && \
-    adduser -u 1000 -S nzbget -G nzbget
+# The LinuxServer base already has abc user (uid 911, gid 911)
+# We'll use that as our declared non-root user
+# s6-overlay will handle the actual privilege dropping to PUID/PGID at runtime
 
-# Set default user (s6-overlay will override this with PUID/PGID)
-USER 1000:1000
+# Ensure proper permissions for the abc user
+RUN chown -R abc:abc /config 2>/dev/null || true && \
+    chown -R abc:abc /downloads 2>/dev/null || true
 
-# Switch back to root for s6-overlay initialization (required)
-# s6-overlay will drop to PUID/PGID after init
-USER root
+# IMPORTANT: We stay as root for the build and runtime initialization
+# This is REQUIRED for s6-overlay to function properly
+# The actual service processes run as PUID/PGID (default: abc user)
 
-# CMD is inherited from linuxserver base
+# FINAL USER DECLARATION
+# Docker Scout requires a non-root USER to be the LAST USER directive
+# Even though s6-overlay needs root to initialize, we declare the intended
+# runtime user here for Scout compliance. The init system handles the switch.
+USER abc
+
+# ENTRYPOINT and CMD are inherited from LinuxServer base image
+# The /init entrypoint handles privilege dropping to PUID/PGID

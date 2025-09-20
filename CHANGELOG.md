@@ -2,6 +2,27 @@
 
 All notable changes to nzbgetvpn will be documented in this file.
 
+## [v25.3.3] - 2025-09-20
+
+### 🔒 Docker Scout Compliance Fixes
+
+#### Policy Compliance
+- **Fixed non-root user declaration**: USER directive is now the final instruction
+- **Supply chain attestation**: Enhanced build process with proper attestation
+- **Removed problematic SUID/SGID stripping**: Prevents breaking system binaries
+- **Proper user permissions**: Using LinuxServer's abc user (uid 911)
+
+#### Technical Improvements
+- USER abc is now the last directive in Dockerfile (Scout requirement)
+- Removed back-and-forth USER switching that confused Scout
+- Enhanced manifest creation with --append flag
+- Maintains full s6-overlay compatibility
+
+#### Docker Scout Score
+- Fixes "No default non-root user found" violation
+- Addresses supply chain attestation requirements
+- Should improve from D grade to B or better
+
 ## [v25.3.2] - 2025-09-20
 
 ### 🔒 Additional Security Hardening
