@@ -328,7 +328,8 @@ jobs:
           echo "Docker Hub tags to create: $DOCKERHUB_TAGS"
           
           # Create manifest
-          docker buildx imagetools create $DOCKERHUB_TAGS \
+          docker buildx imagetools create --append \
+            $DOCKERHUB_TAGS \
             $(printf '${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
           
           echo "✅ Docker Hub manifest created successfully"
