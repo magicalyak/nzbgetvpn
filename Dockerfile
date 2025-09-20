@@ -74,17 +74,12 @@ RUN echo "Building for platform: ${TARGETPLATFORM:-unknown}" && \
     echo "Build platform: ${BUILDPLATFORM:-unknown}"
 
 # Update packages for security before installing new ones
-# Also remove unnecessary packages to reduce attack surface
 RUN apk update && \
     apk upgrade --no-cache && \
-    rm -rf /var/cache/apk/* /tmp/* && \
-    # Remove potentially vulnerable or unnecessary packages
-    apk del --no-cache wget 2>/dev/null || true
+    rm -rf /var/cache/apk/*
 
 # Install OpenVPN, WireGuard, Privoxy, Python3, jq, bc and tools
 # Include platform-specific optimizations
-# Use --no-cache to avoid storing package index
-# Pin versions where possible for reproducibility
 RUN apk add --no-cache \
     openvpn \
     iptables \
@@ -97,9 +92,7 @@ RUN apk add --no-cache \
     py3-psutil \
     jq \
     bc \
-    && for f in /etc/privoxy/*.new; do mv -n "$f" "${f%.new}"; done \
-    && # Clean up any temporary files\
-    rm -rf /tmp/* /var/tmp/*
+    && for f in /etc/privoxy/*.new; do mv -n "$f" "${f%.new}"; done
 
 # Platform-specific optimizations
 RUN case "${TARGETARCH}" in \
@@ -181,27 +174,17 @@ LABEL org.opencontainers.image.title="nzbgetvpn" \
       org.opencontainers.image.base.name="ghcr.io/linuxserver/nzbget:v25.3-ls213"
 
 # Non-root user handling:
-# IMPORTANT: The LinuxServer base image requires root for s6-overlay initialization.
-# However, we need to properly declare the intended runtime user for Docker Scout.
-# The container WILL run as non-root via PUID/PGID environment variables.
+# The LinuxServer base image already provides proper non-root user functionality
+# through PUID/PGID environment variables. Users can run as non-root by setting:
+# PUID=1000 PGID=1000 (or any other valid UID/GID)
+#
+# IMPORTANT: Do NOT add a USER directive here!
+# The LinuxServer s6-overlay REQUIRES root to initialize properly.
+# It will automatically drop privileges to PUID/PGID after initialization.
+# Adding USER breaks the container startup.
+#
+# Docker Scout may report "no non-root user" but this is a false positive
+# for s6-overlay based containers. The container DOES run services as non-root
+# via the PUID/PGID mechanism, which is more flexible than a fixed USER.
 
-# The LinuxServer base already has abc user (uid 911, gid 911)
-# We'll use that as our declared non-root user
-# s6-overlay will handle the actual privilege dropping to PUID/PGID at runtime
-
-# Ensure proper permissions for the abc user
-RUN chown -R abc:abc /config 2>/dev/null || true && \
-    chown -R abc:abc /downloads 2>/dev/null || true
-
-# IMPORTANT: We stay as root for the build and runtime initialization
-# This is REQUIRED for s6-overlay to function properly
-# The actual service processes run as PUID/PGID (default: abc user)
-
-# FINAL USER DECLARATION
-# Docker Scout requires a non-root USER to be the LAST USER directive
-# Even though s6-overlay needs root to initialize, we declare the intended
-# runtime user here for Scout compliance. The init system handles the switch.
-USER abc
-
-# ENTRYPOINT and CMD are inherited from LinuxServer base image
-# The /init entrypoint handles privilege dropping to PUID/PGID
+# CMD is inherited from linuxserver base
