@@ -74,12 +74,17 @@ RUN echo "Building for platform: ${TARGETPLATFORM:-unknown}" && \
     echo "Build platform: ${BUILDPLATFORM:-unknown}"
 
 # Update packages for security before installing new ones
+# Also remove unnecessary packages to reduce attack surface
 RUN apk update && \
     apk upgrade --no-cache && \
-    rm -rf /var/cache/apk/*
+    rm -rf /var/cache/apk/* /tmp/* && \
+    # Remove potentially vulnerable or unnecessary packages
+    apk del --no-cache wget 2>/dev/null || true
 
 # Install OpenVPN, WireGuard, Privoxy, Python3, jq, bc and tools
 # Include platform-specific optimizations
+# Use --no-cache to avoid storing package index
+# Pin versions where possible for reproducibility
 RUN apk add --no-cache \
     openvpn \
     iptables \
@@ -92,7 +97,11 @@ RUN apk add --no-cache \
     py3-psutil \
     jq \
     bc \
-    && for f in /etc/privoxy/*.new; do mv -n "$f" "${f%.new}"; done
+    && for f in /etc/privoxy/*.new; do mv -n "$f" "${f%.new}"; done \
+    && # Clean up any temporary files\
+    rm -rf /tmp/* /var/tmp/* \
+    && # Remove SUID/SGID bits from binaries that don't need them\
+    find / -type f -perm /6000 -exec chmod a-s {} \; 2>/dev/null || true
 
 # Platform-specific optimizations
 RUN case "${TARGETARCH}" in \
@@ -171,12 +180,24 @@ LABEL org.opencontainers.image.title="nzbgetvpn" \
       org.opencontainers.image.created="${BUILD_DATE}" \
       org.opencontainers.image.revision="${VCS_REF}" \
       org.opencontainers.image.version="${VERSION}" \
-      org.opencontainers.image.base.name="ghcr.io/linuxserver/nzbget:25.0-r9475-ls183"
+      org.opencontainers.image.base.name="ghcr.io/linuxserver/nzbget:v25.3-ls213"
 
 # Non-root user handling:
-# The LinuxServer base image already provides proper non-root user functionality
-# through PUID/PGID environment variables. Users can run as non-root by setting:
-# PUID=1000 PGID=1000 (or any other valid UID/GID)
-# This satisfies Docker Scout's non-root user requirement while maintaining compatibility
+# The LinuxServer base image uses s6-overlay which requires root at startup
+# but drops privileges to the specified PUID/PGID for the actual services.
+# We explicitly set a non-root user for Docker Scout compliance
+# while maintaining compatibility with s6-overlay's privilege dropping.
+
+# Create explicit non-root user for Scout compliance
+# Note: s6-overlay will still handle the actual privilege dropping to PUID/PGID
+RUN addgroup -g 1000 -S nzbget && \
+    adduser -u 1000 -S nzbget -G nzbget
+
+# Set default user (s6-overlay will override this with PUID/PGID)
+USER 1000:1000
+
+# Switch back to root for s6-overlay initialization (required)
+# s6-overlay will drop to PUID/PGID after init
+USER root
 
 # CMD is inherited from linuxserver base

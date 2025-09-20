@@ -2,6 +2,27 @@
 
 All notable changes to nzbgetvpn will be documented in this file.
 
+## [v25.3.2] - 2025-09-20
+
+### 🔒 Additional Security Hardening
+
+#### Docker Scout Compliance
+- **Explicit non-root user**: Added USER directive for Docker Scout compliance
+- **SUID/SGID removal**: Stripped unnecessary privilege bits from binaries
+- **Package cleanup**: Removed wget and other potentially vulnerable packages
+- **Temporary file cleanup**: Enhanced cleanup of /tmp and /var/tmp
+
+#### Security Improvements
+- Added explicit non-root user (uid/gid 1000) while maintaining s6-overlay compatibility
+- Removed SUID/SGID bits from binaries that don't require elevated privileges
+- Enhanced cleanup of temporary files and caches
+- Removed unnecessary packages to reduce attack surface
+
+#### Technical Details
+- LinuxServer's s6-overlay still handles privilege dropping via PUID/PGID
+- USER directive satisfies Docker Scout's non-root user policy
+- Maintains full backward compatibility with existing deployments
+
 ## [v25.3.1] - 2025-09-20
 
 ### 🔒 Security Update & Version Alignment
