@@ -2,6 +2,32 @@
 
 All notable changes to nzbgetvpn will be documented in this file.
 
+## [v25.3.4] - 2025-09-20
+
+### 🔄 Revert USER Directive Changes
+
+#### Critical Fix
+- **Removed USER directive**: Was breaking s6-overlay initialization
+- **Restored v25.3.1 approach**: No USER directive, proper functionality
+- **Kept security updates**: Base image and package updates retained
+
+#### Why This Change
+- LinuxServer's s6-overlay REQUIRES root to initialize
+- USER directive prevents proper container startup
+- PUID/PGID mechanism already provides non-root execution
+- v25.3.1 had an A score without USER directive
+
+#### Technical Details
+- s6-overlay handles privilege dropping via PUID/PGID
+- More flexible than fixed USER directive
+- Docker Scout's "no non-root user" is a false positive for s6 containers
+- Container services DO run as non-root (PUID/PGID)
+
+#### Expected Outcome
+- Container functionality restored
+- Docker Scout score should return to A (as in v25.3.1)
+- Full backward compatibility maintained
+
 ## [v25.3.3] - 2025-09-20
 
 ### 🔒 Docker Scout Compliance Fixes
