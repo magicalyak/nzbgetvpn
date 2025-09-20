@@ -2,6 +2,44 @@
 
 All notable changes to nzbgetvpn will be documented in this file.
 
+## [v25.0.44] - 2025-09-20
+
+### 🔒 Enhanced VPN Kill Switch Security
+- **Strict Kill Switch Implementation**: Multi-layer protection against data leaks
+  - ✅ **Default DROP Policies**: All iptables chains (INPUT, FORWARD, OUTPUT) set to DROP
+  - ✅ **DNS Leak Prevention**: Blocks all DNS queries on eth0, only allows through VPN
+  - ✅ **Active VPN Monitoring**: Service that stops NZBGet if VPN connection fails
+  - ✅ **Automatic Recovery**: NZBGet restarts when VPN connection is restored
+  - ✅ **Configurable Health Checks**: VPN_CHECK_INTERVAL and VPN_MAX_FAILURES options
+
+### 🛡️ Security Improvements
+- **Multi-Layer Protection**: Comprehensive kill switch with multiple fail-safes
+  - Strict firewall rules with default deny policies
+  - Packet logging for blocked traffic (when DEBUG=true)
+  - Automatic service shutdown on VPN failure
+  - DNS leak prevention on all interfaces
+  - VPN connection monitoring every 30 seconds (configurable)
+
+### 📚 Documentation Updates
+- **New Documentation**: Comprehensive guides for security and versioning
+  - Added VERSIONING.md for version strategy
+  - Added DOCKER_BUILD_SETUP.md for build configuration
+  - Added VPN_KILLSWITCH_SECURITY.md for security features
+  - Added kill switch verification tools and test scripts
+  - Reorganized documentation structure
+
+### 🔧 Infrastructure Improvements
+- **Docker Hub Configuration**: Streamlined build and deployment
+  - Disabled Docker Hub Autobuild (GitHub Actions handles all builds)
+  - Added Docker Scout configuration for vulnerability scanning
+  - Configured immutable version tags for security
+  - Removed duplicate scheduled build workflow
+
+### 🐛 Fixes
+- Fixed Docker Scout health score warnings
+- Fixed GitHub Actions workflow permissions for security scanning
+- Resolved potential security vulnerabilities in base image
+
 ## [v25.0.39] - 2025-01-27
 
 ### 🚀 GitHub Actions Workflow Rate Limiting Fixes
