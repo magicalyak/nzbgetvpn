@@ -7,7 +7,7 @@ name: Build and Publish Multi-Architecture Docker Images
 
 # Grant permissions for GITHUB_TOKEN to push to GitHub Container Registry
 permissions:
-  contents: read
+  contents: write  # Changed to write for release creation
   packages: write
   security-events: write
 
@@ -496,7 +496,7 @@ jobs:
       - merge
     # Only run for version tags
     if: startsWith(github.ref, 'refs/tags/v')
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -537,3 +537,100 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: 'trivy-results.sarif'
+
+  create-release:
+    runs-on: ubuntu-latest
+    needs:
+      - merge
+      - test-multiarch
+    # Only run for version tags
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0  # Ensure the entire history is fetched
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Creating release for version: $VERSION"
+
+      - name: Extract changelog for this version
+        id: changelog
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          echo "Extracting changelog for $VERSION..."
+
+          # Try to extract the changelog section for this version
+          if [ -f "CHANGELOG.md" ]; then
+            # Extract content between this version and the next version header
+            # This handles various changelog formats
+            CHANGELOG_CONTENT=$(awk -v ver="$VERSION" '
+              /^##? .*'$VERSION'/ { flag=1; next }
+              /^##? / && flag { exit }
+              flag { print }
+            ' CHANGELOG.md | sed '/^$/N;/^\n$/d' | head -20)
+
+            if [ -z "$CHANGELOG_CONTENT" ]; then
+              echo "No specific changelog found for $VERSION, using default"
+              CHANGELOG_CONTENT="See commit history for detailed changes"
+            fi
+          else
+            CHANGELOG_CONTENT="See commit history for detailed changes"
+          fi
+
+          # Save to file for multiline content
+          echo "$CHANGELOG_CONTENT" > changelog_content.txt
+          echo "Changelog content extracted"
+
+      - name: Get previous tag for comparison
+        id: prevtag
+        run: |
+          # Get the previous tag for comparison link
+          CURRENT_TAG="${{ steps.version.outputs.version }}"
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 ${CURRENT_TAG}^ 2>/dev/null || echo "")
+
+          if [ -z "$PREVIOUS_TAG" ]; then
+            echo "No previous tag found"
+            echo "previous_tag=" >> $GITHUB_OUTPUT
+          else
+            echo "Previous tag: $PREVIOUS_TAG"
+            echo "previous_tag=$PREVIOUS_TAG" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: "${{ steps.version.outputs.version }} - NZBGet with VPN"
+          body: |
+            ## Docker Images
+
+            Pull the latest image:
+            ```bash
+            docker pull magicalyak/nzbgetvpn:${{ steps.version.outputs.version }}
+            ```
+
+            Or use the `latest` tag:
+            ```bash
+            docker pull magicalyak/nzbgetvpn:latest
+            ```
+
+            ## What's Changed
+            ${{ steps.changelog.outputs.content || 'See commit history for detailed changes' }}
+
+            ## Full Changelog
+            ${{ steps.prevtag.outputs.previous_tag && format('https://github.com/{0}/compare/{1}...{2}', github.repository, steps.prevtag.outputs.previous_tag, steps.version.outputs.version) || format('https://github.com/{0}/commits/{1}', github.repository, steps.version.outputs.version) }}
+
+            ## Container Registries
+            - Docker Hub: [`magicalyak/nzbgetvpn:${{ steps.version.outputs.version }}`](https://hub.docker.com/r/magicalyak/nzbgetvpn)
+            - GitHub Container Registry: [`ghcr.io/magicalyak/nzbgetvpn:${{ steps.version.outputs.version }}`](https://github.com/magicalyak/nzbgetvpn/pkgs/container/nzbgetvpn)
+          draft: false
+          prerelease: false
+          generate_release_notes: true
