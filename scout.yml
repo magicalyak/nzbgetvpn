@@ -1,0 +1,69 @@
+# Docker Scout Configuration
+# This file configures Docker Scout for vulnerability scanning and policy enforcement
+
+# Docker Scout analyzes images for:
+# - Known CVEs (Common Vulnerabilities and Exposures)
+# - License compliance
+# - Base image currency
+# - Secret scanning
+
+policies:
+  - id: cve-critical-high
+    name: "Critical and High CVEs"
+    description: "Flag images with critical or high severity CVEs"
+    gates:
+      - vulnerability:
+          severity:
+            - CRITICAL
+            - HIGH
+          action: WARN
+
+  - id: base-image-freshness
+    name: "Base Image Freshness"
+    description: "Ensure base images are up to date"
+    gates:
+      - base-image-freshness:
+          max-days-old: 30
+          action: WARN
+
+  - id: no-root-user
+    name: "Non-root User"
+    description: "Ensure container doesn't run as root"
+    gates:
+      - user:
+          disallow-root: true
+          action: WARN
+
+  - id: minimal-packages
+    name: "Minimal Package Installation"
+    description: "Reduce attack surface by minimizing installed packages"
+    gates:
+      - packages:
+          max-count: 500
+          action: INFO
+
+# Scanning configuration
+scanning:
+  # Scan on push to registry
+  auto-scan: true
+
+  # Scan frequency for existing images
+  schedule: "daily"
+
+  # Remediation suggestions
+  provide-fixes: true
+
+  # Include SBOM (Software Bill of Materials)
+  sbom: true
+
+# Integration settings
+integrations:
+  # GitHub integration for PR comments
+  github:
+    enabled: true
+    comment-on-pr: true
+
+  # Registry scanning
+  registries:
+    - docker.io/magicalyak/nzbgetvpn
+    - ghcr.io/magicalyak/nzbgetvpn
