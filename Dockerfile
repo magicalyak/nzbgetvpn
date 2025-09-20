@@ -3,7 +3,8 @@
 
 # Use specific version tag for reproducibility and attestation
 # LinuxServer base already handles non-root user via PUID/PGID
-FROM ghcr.io/linuxserver/nzbget:25.0-r9475-ls183
+# Base image: NZBGet v25.3 (LinuxServer build ls213)
+FROM ghcr.io/linuxserver/nzbget:v25.3-ls213
 
 # Build arguments for multi-architecture support
 ARG BUILDPLATFORM
@@ -71,6 +72,11 @@ ENV TARGETARCH=${TARGETARCH}
 RUN echo "Building for platform: ${TARGETPLATFORM:-unknown}" && \
     echo "Target architecture: ${TARGETARCH:-unknown}" && \
     echo "Build platform: ${BUILDPLATFORM:-unknown}"
+
+# Update packages for security before installing new ones
+RUN apk update && \
+    apk upgrade --no-cache && \
+    rm -rf /var/cache/apk/*
 
 # Install OpenVPN, WireGuard, Privoxy, Python3, jq, bc and tools
 # Include platform-specific optimizations

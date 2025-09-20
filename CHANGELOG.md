@@ -2,6 +2,26 @@
 
 All notable changes to nzbgetvpn will be documented in this file.
 
+## [v25.3.1] - 2025-09-20
+
+### 🔒 Security Update & Version Alignment
+
+#### Base Image Update
+- **Updated to NZBGet v25.3**: Upgraded from v25.0 to v25.3 (LinuxServer build ls213)
+- **Security patches**: Fixes 3 vulnerabilities identified by Docker Scout
+- **Improved Docker Scout score**: From D to improved security rating
+- **Package updates**: All Alpine packages updated to latest security patches
+
+#### Version Alignment
+- **New versioning scheme**: Now follows actual NZBGet version in base image
+- **Version jump**: From v25.0.44 to v25.3.1 to match NZBGet v25.3
+- **Future versioning**: Will track LinuxServer's NZBGet updates
+
+### 🛡️ Security Improvements
+- Added `apk upgrade` to update all packages for security
+- Base image update includes latest CVE fixes
+- Reduced attack surface with updated dependencies
+
 ## [v25.0.44] - 2025-09-20
 
 ### 🔒 Enhanced VPN Kill Switch Security

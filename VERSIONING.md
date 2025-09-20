@@ -10,11 +10,13 @@ This project follows the upstream NZBGet version numbering with additional patch
 v<NZBGET_MAJOR>.<NZBGET_MINOR>.<CONTAINER_PATCH>
 ```
 
-- **NZBGET_MAJOR**: Major version from upstream NZBGet (currently 25)
-- **NZBGET_MINOR**: Minor version from upstream NZBGet (currently 0)
+- **NZBGET_MAJOR**: Major version from upstream NZBGet
+- **NZBGET_MINOR**: Minor version from upstream NZBGet
 - **CONTAINER_PATCH**: Our container-specific patch number
 
-Example: `v25.0.43` means NZBGet v25.0 with our 43rd container update
+Example: `v25.3.1` means NZBGet v25.3 with our 1st container update for that version
+
+**Important**: We follow the actual NZBGet version in our base image (LinuxServer), not the version we started with. When LinuxServer updates NZBGet, we reset our patch number.
 
 ## Build and Release Strategy
 
