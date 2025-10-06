@@ -7,10 +7,13 @@ env:
   REGISTRY_DOCKERHUB: docker.io
   IMAGE_NAME: magicalyak/nzbgetvpn
 
+permissions:
+  contents: read
+
 jobs:
   test-push:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5

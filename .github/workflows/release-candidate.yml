@@ -17,6 +17,10 @@ env:
   REGISTRY_GHCR: ghcr.io
   IMAGE_NAME: magicalyak/nzbgetvpn
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   build-rc:
     runs-on: ubuntu-latest

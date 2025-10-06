@@ -9,6 +9,9 @@ env:
   REGISTRY_DOCKERHUB: docker.io
   IMAGE_NAME: magicalyak/nzbgetvpn
 
+permissions:
+  contents: read
+
 jobs:
   create-version-tags:
     runs-on: ubuntu-latest
