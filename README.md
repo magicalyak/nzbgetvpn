@@ -174,6 +174,32 @@ services:
 
 Run with: `docker-compose up -d`
 
+## ☸️ Kubernetes/K3s Deployment
+
+Deploy nzbgetvpn on Kubernetes or K3s with proper VPN isolation and monitoring.
+
+**Quick K3s deployment:**
+
+```bash
+# Create namespace and secrets
+kubectl create namespace nzbgetvpn
+kubectl create secret generic vpn-config \
+  --from-file=provider.ovpn=/path/to/vpn-config.ovpn \
+  -n nzbgetvpn
+
+# Deploy using kubectl
+kubectl apply -f https://raw.githubusercontent.com/magicalyak/nzbgetvpn/main/k8s/deployment.yaml
+```
+
+**Features:**
+- VPN-isolated pods with NET_ADMIN capabilities
+- Persistent storage for config and downloads
+- Health monitoring and auto-restart
+- Prometheus metrics integration
+- Ingress support for external access
+
+**👉 Complete K3s/Kubernetes guide:** [K3S_DEPLOYMENT.md](K3S_DEPLOYMENT.md)
+
 ## 🔧 Essential Environment Variables
 
 | Variable | Description | Example |
