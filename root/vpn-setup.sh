@@ -389,11 +389,11 @@ echo "[INFO] DNS leak prevention rules applied - DNS only allowed through VPN"
 iptables -A INPUT -i eth0 -p tcp --dport 6789 -j ACCEPT
 echo "[INFO] Added iptables rule to allow NZBGet UI on eth0:6789."
 
-# Allow monitoring access from host 
+# Allow monitoring access from host
 iptables -A INPUT -i eth0 -p tcp --dport 8080 -j ACCEPT
 echo "[INFO] Added iptables rule to allow monitoring on eth0:8080."
 
-# Policy routing for NZBGet UI & Privoxy when accessed from host
+# Policy routing for NZBGet UI, monitoring & Privoxy when accessed from host
 # This ensures replies to connections hitting eth0 go back out via eth0 gateway, not VPN tunnel
 echo "[INFO] Adding CONNMARK policy routing for UI access (mark 0x1, table 100)"
 
@@ -414,6 +414,17 @@ ip rule add fwmark 0x1 lookup 100 priority 1000
 ip route add default via "$ETH0_GATEWAY" dev eth0 table 100
 
 echo "[INFO] CONNMARK rules for NZBGet UI (port 6789) applied."
+
+# Add CONNMARK rules for monitoring port 8080
+if [ -n "$ETH0_IP" ]; then
+  echo "[INFO] Adding CONNMARK rules for monitoring server on port 8080 to $ETH0_IP"
+  iptables -t mangle -A PREROUTING -d "$ETH0_IP" -p tcp --dport 8080 -j CONNMARK --set-mark 0x1
+else
+  echo "[WARN] ETH0_IP not found, using less specific -i eth0 for PREROUTING CONNMARK rule for monitoring server."
+  iptables -t mangle -A PREROUTING -i eth0 -p tcp --dport 8080 -j CONNMARK --set-mark 0x1
+fi
+iptables -t mangle -A OUTPUT -p tcp --sport 8080 -j CONNMARK --restore-mark
+echo "[INFO] CONNMARK rules for monitoring server (port 8080) applied."
 
 
 # VPN is up, redirect all other OUTPUT traffic through VPN interface
