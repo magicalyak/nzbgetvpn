@@ -134,7 +134,15 @@ apply_strict_iptables() {
     # Mark connections to NZBGet UI
     if [ -n "$ETH0_IP" ]; then
         iptables -t mangle -A PREROUTING -d "$ETH0_IP" -p tcp --dport 6789 -j CONNMARK --set-mark 0x1
+    else
+        iptables -t mangle -A PREROUTING -i eth0 -p tcp --dport 6789 -j CONNMARK --set-mark 0x1
+    fi
+
+    # Mark connections to monitoring port
+    if [ -n "$ETH0_IP" ]; then
         iptables -t mangle -A PREROUTING -d "$ETH0_IP" -p tcp --dport 8080 -j CONNMARK --set-mark 0x1
+    else
+        iptables -t mangle -A PREROUTING -i eth0 -p tcp --dport 8080 -j CONNMARK --set-mark 0x1
     fi
 
     # Restore mark for response packets
@@ -144,6 +152,8 @@ apply_strict_iptables() {
     # Create routing table for marked packets
     ip rule add fwmark 0x1 lookup 100 priority 1000 2>/dev/null || true
     ip route add default via "$ETH0_GATEWAY" dev eth0 table 100 2>/dev/null || true
+
+    echo "[KILLSWITCH] Applied CONNMARK rules for NZBGet UI (6789) and monitoring (8080)"
 
     # Allow all traffic through VPN interface
     iptables -A OUTPUT -o "$VPN_INTERFACE" -j ACCEPT
