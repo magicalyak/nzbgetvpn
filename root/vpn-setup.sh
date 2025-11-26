@@ -292,8 +292,47 @@ start_wireguard() {
       fi
   fi
   INTERFACE_NAME=$(cat "$VPN_INTERFACE_FILE")
+
+  # Log config details for debugging (without private key)
+  echo "[INFO] WireGuard config contents (sanitized):"
+  grep -v "PrivateKey" "$WG_CONFIG" | head -20
+
   echo "[INFO] Starting WireGuard for interface $INTERFACE_NAME using $WG_CONFIG..."
-  wg-quick up "$WG_CONFIG"
+
+  # Run wg-quick with verbose output
+  if ! wg-quick up "$WG_CONFIG" 2>&1; then
+    echo "[ERROR] wg-quick up failed. Check config file and permissions."
+    echo "[DEBUG] Attempting to show wg-quick error details..."
+    # Try to bring down first in case partial setup
+    wg-quick down "$WG_CONFIG" 2>/dev/null || true
+    # Retry with more verbose output
+    WG_QUICK_OUT=$(wg-quick up "$WG_CONFIG" 2>&1) || true
+    echo "[DEBUG] wg-quick output: $WG_QUICK_OUT"
+  fi
+
+  # Verify interface is up
+  sleep 2
+  if ip link show "$INTERFACE_NAME" >/dev/null 2>&1; then
+    echo "[INFO] WireGuard interface $INTERFACE_NAME exists"
+    ip link show "$INTERFACE_NAME"
+
+    # Check if interface has an IP
+    WG_IP=$(ip -4 addr show "$INTERFACE_NAME" 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
+    if [ -n "$WG_IP" ]; then
+      echo "[INFO] WireGuard interface has IP: $WG_IP"
+    else
+      echo "[WARN] WireGuard interface has no IPv4 address assigned"
+    fi
+
+    # Show WireGuard status
+    echo "[INFO] WireGuard status:"
+    wg show "$INTERFACE_NAME" 2>/dev/null || echo "[WARN] Could not get wg show output"
+  else
+    echo "[ERROR] WireGuard interface $INTERFACE_NAME does not exist after wg-quick up"
+    echo "[DEBUG] Available interfaces:"
+    ip link show
+  fi
+
   echo "[INFO] WireGuard started. Interface: $INTERFACE_NAME"
   # For WireGuard, DNS is typically set in the .conf file's [Interface] section (DNS = x.x.x.x)
   # wg-quick should handle setting this up.
@@ -525,8 +564,49 @@ if [ "${VPN_CLIENT,,}" = "openvpn" ]; then
     iptables -A OUTPUT -p tcp --dport 1194 -j ACCEPT
   fi
 elif [ "${VPN_CLIENT,,}" = "wireguard" ]; then
-  echo "[INFO] WireGuard detected. Adding standard WireGuard port exception (51820/udp)."
-  iptables -A OUTPUT -p udp --dport 51820 -j ACCEPT
+  echo "[INFO] WireGuard detected. Extracting endpoint from config for kill switch exception..."
+  WG_CONFIG_FILE="$VPN_CONFIG"
+  if [ -z "$WG_CONFIG_FILE" ]; then
+    WG_CONFIG_FILE=$(find /config/wireguard -maxdepth 1 -name '*.conf' -print -quit)
+  fi
+
+  if [ -f "$WG_CONFIG_FILE" ]; then
+    # Extract Endpoint from WireGuard config (format: Endpoint = hostname:port or ip:port)
+    WG_ENDPOINT=$(grep -E "^Endpoint\s*=" "$WG_CONFIG_FILE" | head -1 | sed 's/.*=\s*//' | xargs)
+    if [ -n "$WG_ENDPOINT" ]; then
+      WG_SERVER_HOST=$(echo "$WG_ENDPOINT" | cut -d':' -f1)
+      WG_SERVER_PORT=$(echo "$WG_ENDPOINT" | cut -d':' -f2)
+      [ -z "$WG_SERVER_PORT" ] && WG_SERVER_PORT="51820"
+
+      echo "[INFO] WireGuard endpoint: $WG_SERVER_HOST:$WG_SERVER_PORT"
+
+      # Resolve hostname to IP if needed
+      if echo "$WG_SERVER_HOST" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
+        WG_SERVER_IP="$WG_SERVER_HOST"
+      else
+        echo "[INFO] Resolving WireGuard server hostname: $WG_SERVER_HOST"
+        WG_SERVER_IP=$(nslookup "$WG_SERVER_HOST" 2>/dev/null | awk '/^Address: / { print $2 }' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+        if [ -z "$WG_SERVER_IP" ]; then
+          WG_SERVER_IP=$(getent hosts "$WG_SERVER_HOST" 2>/dev/null | awk '{print $1}' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+        fi
+      fi
+
+      if [ -n "$WG_SERVER_IP" ]; then
+        echo "[INFO] Adding kill switch exception for WireGuard server: $WG_SERVER_IP:$WG_SERVER_PORT (udp)"
+        iptables -A OUTPUT -d "$WG_SERVER_IP" -p udp --dport "$WG_SERVER_PORT" -j ACCEPT
+        echo "[INFO] WireGuard server connectivity exception added successfully"
+      else
+        echo "[WARN] Could not resolve WireGuard server IP for $WG_SERVER_HOST. Adding fallback exception."
+        iptables -A OUTPUT -p udp --dport "$WG_SERVER_PORT" -j ACCEPT
+      fi
+    else
+      echo "[WARN] No Endpoint found in WireGuard config. Adding fallback exception for port 51820."
+      iptables -A OUTPUT -p udp --dport 51820 -j ACCEPT
+    fi
+  else
+    echo "[WARN] WireGuard config file not found. Adding fallback port exception."
+    iptables -A OUTPUT -p udp --dport 51820 -j ACCEPT
+  fi
 fi
 
 # STRICT KILLSWITCH - Log and drop any remaining eth0 traffic
