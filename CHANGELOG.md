@@ -2,6 +2,18 @@
 
 All notable changes to nzbgetvpn will be documented in this file.
 
+## [v25.4.2] - 2025-12-17
+
+### Base Image Update
+- Updated to LinuxServer NZBGet v25.4-ls224 (from ls221)
+
+### Upstream Changes (LinuxServer)
+- TLS 1.3 cipher suite support
+- Web UI search bar improvements for small screens
+- Fixes for Scan script API
+- RSS feed category handling improvements
+- JSON value parsing updates
+
 ## [v25.3.4] - 2025-09-20
 
 ### 🔄 Revert USER Directive Changes
