@@ -431,12 +431,13 @@ jobs:
       - merge
     # Only run for version tags
     if: startsWith(github.ref, 'refs/tags/v')
+    timeout-minutes: 15
     strategy:
       matrix:
         platform:
           - linux/amd64
           - linux/arm64
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
