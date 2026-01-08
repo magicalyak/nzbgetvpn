@@ -2,6 +2,11 @@
 
 All notable changes to nzbgetvpn will be documented in this file.
 
+## [v25.4.4] - 2026-01-07
+
+### Fixed
+- **VPN Kill Switch Deadlock**: Fixed ip rule/route commands failing on container restart due to "File exists" errors. With set -e enabled, these failures caused the vpn-setup.sh script to exit before adding VPN server exception rules, resulting in a kill switch deadlock where the VPN couldn't connect.
+
 ## [v25.4.2] - 2025-12-17
 
 ### Base Image Update
