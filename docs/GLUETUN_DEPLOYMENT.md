@@ -229,6 +229,44 @@ environment:
   - SERVER_COUNTRIES=United States
 ```
 
+## VPN Monitoring in External Mode
+
+When using `VPN_CLIENT=external`, nzbgetvpn provides:
+
+### Automatic Protection
+- **IP Leak Detection**: Records VPN IP on startup, monitors for changes
+- **Kill Switch**: NZBGet automatically stopped if IP changes (VPN failure)
+- **Auto-Recovery**: NZBGet restarted when VPN connection restores
+
+### How It Works
+1. On startup, nzbgetvpn records your VPN's external IP
+2. Health checks periodically verify the IP hasn't changed
+3. If IP changes (VPN down), NZBGet is immediately stopped
+4. When VPN recovers (IP matches again), NZBGet restarts
+
+### Monitoring Endpoints
+```bash
+# Check health status
+curl http://localhost:8080/health
+
+# Response in external mode shows:
+# - vpn_interface: external
+# - vpn_connectivity: success/failed
+# - ip_leak: stable/detected
+```
+
+### Notifications
+Configure webhooks for VPN failure alerts:
+```yaml
+environment:
+  - NOTIFICATION_WEBHOOK_URL=https://discord.com/api/webhooks/...
+```
+
+Events sent:
+- `vpn_failure`: VPN failure detected
+- `nzbget_stopped`: NZBGet stopped to prevent leaks
+- `vpn_recovered`: VPN restored, NZBGet restarted
+
 ## Verifying VPN Connection
 
 Check that traffic is routed through VPN:
