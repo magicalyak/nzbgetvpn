@@ -26,6 +26,7 @@ ENV VPN_USER=$VPN_USER
 ENV VPN_PASS=$VPN_PASS
 
 # Additional ENV for runtime variables needed by s6 scripts
+# VPN_CLIENT options: openvpn, wireguard, external (for gluetun sidecar), none
 ENV VPN_CLIENT=${VPN_CLIENT:-openvpn}
 ENV VPN_CONFIG=${VPN_CONFIG:-}
 ENV ENABLE_PRIVOXY=${ENABLE_PRIVOXY:-no}

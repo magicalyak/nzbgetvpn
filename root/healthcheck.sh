@@ -160,13 +160,30 @@ check_nzbget() {
     fi
 }
 
+# Check if running in external VPN mode
+is_external_vpn_mode() {
+    if [[ -f "/tmp/vpn_external_mode" ]]; then
+        return 0
+    fi
+    if [[ -f "$VPN_INTERFACE_FILE" ]] && [[ "$(cat "$VPN_INTERFACE_FILE")" == "external" ]]; then
+        return 0
+    fi
+    return 1
+}
+
 # FIXED: Function to determine VPN interface - now properly isolates return value from debug output
 determine_vpn_interface() {
     local vpn_if=""
-    
+
     if [[ -f "$VPN_INTERFACE_FILE" ]]; then
         vpn_if=$(cat "$VPN_INTERFACE_FILE")
         log "DEBUG" "VPN interface from file: $vpn_if"
+
+        # External mode - return special value
+        if [[ "$vpn_if" == "external" ]]; then
+            echo "external"
+            return 0
+        fi
     else
         log "DEBUG" "VPN interface file not found, attempting to detect..."
         
@@ -450,9 +467,45 @@ main() {
     
     # Check 2: VPN interface
     if vpn_interface=$(determine_vpn_interface); then
-        if check_vpn_interface "$vpn_interface"; then
+        if [[ "$vpn_interface" == "external" ]]; then
+            # External VPN mode - skip interface check, rely on IP leak detection
+            log "DEBUG" "External VPN mode - skipping interface check"
+            status_checks+=("vpn_interface:external")
+
+            # In external mode, verify VPN is working by checking external IP
+            local current_ip=$(get_external_ip)
+            local expected_ip=""
+            if [[ -f "/tmp/expected_vpn_ip" ]]; then
+                expected_ip=$(cat /tmp/expected_vpn_ip)
+            fi
+
+            if [[ -n "$current_ip" ]] && [[ -n "$expected_ip" ]]; then
+                if [[ "$current_ip" == "$expected_ip" ]]; then
+                    status_checks+=("vpn_connectivity:success")
+                    log "DEBUG" "External VPN check passed - IP matches: $current_ip"
+                else
+                    # IP changed - VPN may have failed
+                    overall_status="unhealthy"
+                    [[ $exit_code -eq 0 ]] && exit_code=7
+                    status_checks+=("vpn_connectivity:failed")
+                    status_checks+=("ip_leak:detected")
+                    log "ERROR" "External VPN failure - IP changed from $expected_ip to $current_ip"
+                fi
+            elif [[ -z "$current_ip" ]]; then
+                # Can't reach internet - network issue
+                if [[ "$overall_status" == "healthy" ]]; then
+                    overall_status="degraded"
+                fi
+                [[ $exit_code -eq 0 ]] && exit_code=4
+                status_checks+=("vpn_connectivity:failed")
+                log "WARNING" "Cannot determine external IP - network may be down"
+            else
+                # No expected IP recorded, just check we have connectivity
+                status_checks+=("vpn_connectivity:success")
+            fi
+        elif check_vpn_interface "$vpn_interface"; then
             status_checks+=("vpn_interface:up")
-            
+
             # Check 3: VPN connectivity (if interface is up)
             if check_vpn_connectivity "$vpn_interface"; then
                 status_checks+=("vpn_connectivity:success")

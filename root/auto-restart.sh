@@ -13,6 +13,15 @@ MAX_RESTART_ATTEMPTS=${MAX_RESTART_ATTEMPTS:-3}
 ENABLE_AUTO_RESTART=${ENABLE_AUTO_RESTART:-false}
 RESTART_ON_VPN_FAILURE=${RESTART_ON_VPN_FAILURE:-true}
 RESTART_ON_NZBGET_FAILURE=${RESTART_ON_NZBGET_FAILURE:-true}
+EXTERNAL_VPN_MODE=${EXTERNAL_VPN_MODE:-false}
+
+# Check if running in external VPN mode
+is_external_vpn_mode() {
+    if [[ -f "/tmp/vpn_external_mode" ]] || [[ "$EXTERNAL_VPN_MODE" == "true" ]]; then
+        return 0
+    fi
+    return 1
+}
 
 # State files
 LAST_VPN_RESTART_FILE="/tmp/last_vpn_restart"
@@ -90,6 +99,64 @@ get_check_status() {
     
     local status=$(jq -r ".checks.${check_name} // \"unknown\"" "$STATUS_FILE" 2>/dev/null || echo "unknown")
     echo "$status"
+}
+
+# Stop NZBGet to prevent IP leaks (used in external VPN mode)
+stop_nzbget_on_vpn_failure() {
+    log "CRITICAL" "VPN failure detected in external mode - stopping NZBGet to prevent IP leaks"
+
+    # Stop NZBGet immediately
+    if pgrep nzbget >/dev/null 2>&1; then
+        log "WARNING" "Stopping NZBGet processes"
+        pkill -TERM nzbget || true
+        sleep 3
+
+        # Force kill if still running
+        if pgrep nzbget >/dev/null 2>&1; then
+            pkill -KILL nzbget || true
+        fi
+
+        log "INFO" "NZBGet stopped to prevent IP leaks"
+    else
+        log "INFO" "NZBGet already stopped"
+    fi
+
+    # Create a marker file to indicate VPN failure state
+    echo "$(date -Iseconds)" > /tmp/vpn_failure_detected
+
+    return 0
+}
+
+# Check if NZBGet should be resumed after external VPN recovery
+check_external_vpn_recovery() {
+    if ! is_external_vpn_mode; then
+        return 1
+    fi
+
+    # Check if we're in VPN failure state
+    if [[ ! -f "/tmp/vpn_failure_detected" ]]; then
+        return 1
+    fi
+
+    # Check current external IP
+    local current_ip=$(curl -sf --max-time 5 ifconfig.me 2>/dev/null || true)
+    local expected_ip=""
+
+    if [[ -f "/tmp/expected_vpn_ip" ]]; then
+        expected_ip=$(cat /tmp/expected_vpn_ip)
+    fi
+
+    if [[ -n "$current_ip" ]] && [[ -n "$expected_ip" ]] && [[ "$current_ip" == "$expected_ip" ]]; then
+        log "INFO" "External VPN recovered - IP matches expected VPN IP: $current_ip"
+        rm -f /tmp/vpn_failure_detected
+
+        # Restart NZBGet
+        log "INFO" "Restarting NZBGet after VPN recovery"
+        restart_nzbget
+        return 0
+    fi
+
+    return 1
 }
 
 # Restart VPN service
@@ -285,16 +352,34 @@ monitor_and_restart() {
         # Check VPN status
         if [[ "$RESTART_ON_VPN_FAILURE" == "true" ]]; then
             local vpn_status=$(get_check_status "vpn_interface")
-            if [[ "$vpn_status" == "down" ]] || [[ "$vpn_status" == "failed" ]]; then
-                log "WARNING" "VPN interface failure detected"
-                send_notification "vpn_failure" "VPN interface is down, attempting restart"
-                
-                if restart_vpn; then
-                    send_notification "vpn_restart_success" "VPN successfully restarted"
+            local ip_leak_status=$(get_check_status "ip_leak")
+
+            # Detect VPN failure (interface down or IP leak detected)
+            if [[ "$vpn_status" == "down" ]] || [[ "$vpn_status" == "failed" ]] || [[ "$ip_leak_status" == "detected" ]]; then
+                log "WARNING" "VPN failure detected (interface: $vpn_status, ip_leak: $ip_leak_status)"
+
+                if is_external_vpn_mode; then
+                    # External VPN mode: stop NZBGet to prevent leaks, don't try to restart VPN
+                    send_notification "vpn_failure" "VPN failure detected in external mode - stopping NZBGet"
+                    stop_nzbget_on_vpn_failure
+                    send_notification "nzbget_stopped" "NZBGet stopped to prevent IP leaks. Waiting for VPN recovery."
                 else
-                    send_notification "vpn_restart_failed" "VPN restart failed"
+                    # Internal VPN mode: try to restart VPN
+                    send_notification "vpn_failure" "VPN interface is down, attempting restart"
+                    if restart_vpn; then
+                        send_notification "vpn_restart_success" "VPN successfully restarted"
+                    else
+                        send_notification "vpn_restart_failed" "VPN restart failed"
+                    fi
                 fi
                 restart_needed=true
+            fi
+        fi
+
+        # Check for external VPN recovery
+        if is_external_vpn_mode; then
+            if check_external_vpn_recovery; then
+                send_notification "vpn_recovered" "External VPN recovered - NZBGet restarted"
             fi
         fi
         
