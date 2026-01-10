@@ -204,13 +204,64 @@ kubectl apply -f https://raw.githubusercontent.com/magicalyak/nzbgetvpn/main/k8s
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `VPN_CLIENT` | VPN type (`openvpn` or `wireguard`) | `openvpn` |
+| `VPN_CLIENT` | VPN type (`openvpn`, `wireguard`, or `external`) | `openvpn` |
 | `VPN_CONFIG` | Path to config file inside container | `/config/openvpn/provider.ovpn` |
 | `VPN_USER` | VPN username (OpenVPN) | `your_username` |
 | `VPN_PASS` | VPN password (OpenVPN) | `your_password` |
 | `PUID` | User ID for file permissions | `1000` |
 | `PGID` | Group ID for file permissions | `1000` |
 | `TZ` | Timezone | `America/New_York` |
+
+## 🔌 External VPN Mode (Gluetun Sidecar)
+
+For more VPN providers or better stability, use nzbgetvpn with [Gluetun](https://github.com/qdm12/gluetun) as an external VPN container:
+
+```yaml
+# docker-compose-gluetun.yml
+services:
+  gluetun:
+    image: qmcgaw/gluetun:latest
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    environment:
+      - VPN_SERVICE_PROVIDER=nordvpn
+      - VPN_TYPE=openvpn
+      - OPENVPN_USER=${VPN_USER}
+      - OPENVPN_PASSWORD=${VPN_PASS}
+      - FIREWALL_VPN_INPUT_PORTS=6789
+    ports:
+      - "6789:6789"
+
+  nzbgetvpn:
+    image: magicalyak/nzbgetvpn:latest
+    network_mode: "service:gluetun"
+    depends_on:
+      gluetun:
+        condition: service_healthy
+    environment:
+      - VPN_CLIENT=external  # Skip internal VPN setup
+      - PUID=1000
+      - PGID=1000
+    volumes:
+      - ./config:/config
+      - ./downloads:/downloads
+```
+
+**Benefits of Gluetun:**
+- Native support for 30+ VPN providers
+- Built-in kill switch and DNS leak protection
+- WireGuard support for all providers
+- Active maintenance and regular updates
+
+**External Mode Features:**
+- Records VPN IP on startup for leak detection
+- Automatically stops NZBGet if VPN fails (IP changes)
+- Auto-restarts NZBGet when VPN recovers
+- Webhook notifications for VPN events
+
+**Full guide:** [docs/GLUETUN_DEPLOYMENT.md](docs/GLUETUN_DEPLOYMENT.md)
 
 ## ✅ Verify Everything Works
 
