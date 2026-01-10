@@ -50,7 +50,8 @@ case "$PROVIDER" in
 
       if [ -n "$COUNTRY_ID" ]; then
         echo "[INFO] Country ID for $COUNTRY_CODE_UPPER: $COUNTRY_ID"
-        API_URL="https://api.nordvpn.com/v1/servers/recommendations?filters[country_id]=${COUNTRY_ID}&limit=1"
+        # URL-encode the brackets in filters parameter
+        API_URL="https://api.nordvpn.com/v1/servers/recommendations?filters%5Bcountry_id%5D=${COUNTRY_ID}&limit=1"
         RECOMMENDED=$(curl -sf "$API_URL" 2>/dev/null | jq -r '.[0].hostname // empty' || true)
       else
         echo "[WARN] Could not lookup country ID for $NORD_COUNTRY"
