@@ -1,0 +1,88 @@
+version: "3.8"
+
+# Example: NZBGet with Gluetun VPN sidecar
+# This configuration uses Gluetun (https://github.com/qdm12/gluetun) as an external VPN
+# container, providing better VPN provider support and stability.
+
+services:
+  gluetun:
+    image: qmcgaw/gluetun:latest
+    container_name: gluetun
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    environment:
+      # VPN Provider Configuration - See https://github.com/qdm12/gluetun-wiki
+      # Common providers: nordvpn, expressvpn, mullvad, protonvpn, surfshark, pia
+      - VPN_SERVICE_PROVIDER=nordvpn
+      - VPN_TYPE=openvpn
+      # For NordVPN OpenVPN: use service credentials from account dashboard
+      - OPENVPN_USER=${VPN_USER}
+      - OPENVPN_PASSWORD=${VPN_PASS}
+      # Optional: Filter servers by country
+      - SERVER_COUNTRIES=United States
+      # Allow NZBGet port through VPN firewall
+      - FIREWALL_VPN_INPUT_PORTS=6789
+      - TZ=${TZ:-America/New_York}
+    ports:
+      # Expose NZBGet through gluetun
+      - "6789:6789"
+      - "8080:8080"
+    volumes:
+      - gluetun-data:/gluetun
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "/gluetun-entrypoint", "healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  nzbgetvpn:
+    image: magicalyak/nzbgetvpn:latest
+    container_name: nzbgetvpn
+    # Use gluetun's network stack - all traffic goes through VPN
+    network_mode: "service:gluetun"
+    depends_on:
+      gluetun:
+        condition: service_healthy
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${TZ:-America/New_York}
+      # Use external VPN mode - skip internal VPN setup
+      - VPN_CLIENT=external
+      # Monitoring settings
+      - ENABLE_MONITORING=${ENABLE_MONITORING:-yes}
+      - MONITORING_PORT=8080
+    volumes:
+      - ./config:/config
+      - ./downloads:/downloads
+    restart: unless-stopped
+
+volumes:
+  gluetun-data:
+
+# Quick Start:
+# 1. Copy .env.sample to .env and set VPN_USER/VPN_PASS to your VPN service credentials
+# 2. Update VPN_SERVICE_PROVIDER if not using NordVPN
+# 3. Create config/ and downloads/ directories
+# 4. Run: docker-compose -f docker-compose-gluetun.yml up -d
+# 5. Access NZBGet at http://localhost:6789
+#
+# Supported VPN Providers (partial list):
+# - nordvpn (OpenVPN or WireGuard)
+# - expressvpn
+# - mullvad (OpenVPN or WireGuard)
+# - protonvpn (OpenVPN or WireGuard)
+# - surfshark
+# - pia (Private Internet Access)
+# - See full list: https://github.com/qdm12/gluetun-wiki/tree/main/setup/providers
+#
+# Benefits of Gluetun:
+# - Native support for 30+ VPN providers
+# - Built-in kill switch
+# - DNS over TLS
+# - Automatic server selection
+# - Health checking
+# - Regular updates

@@ -26,8 +26,13 @@ ENV VPN_USER=$VPN_USER
 ENV VPN_PASS=$VPN_PASS
 
 # Additional ENV for runtime variables needed by s6 scripts
+# VPN_CLIENT options: openvpn, wireguard, external (for gluetun sidecar), none
 ENV VPN_CLIENT=${VPN_CLIENT:-openvpn}
 ENV VPN_CONFIG=${VPN_CONFIG:-}
+# VPN_PROVIDER for auto-configuration: nordvpn, mullvad, pia, surfshark, custom
+ENV VPN_PROVIDER=${VPN_PROVIDER:-}
+ENV VPN_COUNTRY=${VPN_COUNTRY:-us}
+ENV VPN_SERVER=${VPN_SERVER:-}
 ENV ENABLE_PRIVOXY=${ENABLE_PRIVOXY:-no}
 ENV DEBUG=${DEBUG:-false}
 # Default umask, gives rwxr-xr-x for dirs, rw-r--r-- for files. Handled by LSIO base scripts.
@@ -115,6 +120,7 @@ RUN case "${TARGETARCH}" in \
 
 # Copy s6-overlay init scripts
 COPY root/etc/cont-init.d/01-ensure-vpn-config-dirs.sh /etc/cont-init.d/01-ensure-vpn-config-dirs
+COPY root/etc/cont-init.d/02-vpn-provider-setup.sh /etc/cont-init.d/02-vpn-provider-setup
 COPY root/etc/cont-init.d/99-nzbget-news-server-override.sh /etc/cont-init.d/99-nzbget-news-server-override
 COPY root/vpn-setup.sh /etc/cont-init.d/50-vpn-setup
 

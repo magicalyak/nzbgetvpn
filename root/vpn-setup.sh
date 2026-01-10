@@ -355,8 +355,18 @@ if [ "${VPN_CLIENT,,}" = "openvpn" ]; then
   start_openvpn
 elif [ "${VPN_CLIENT,,}" = "wireguard" ]; then
   start_wireguard
+elif [ "${VPN_CLIENT,,}" = "external" ] || [ "${VPN_CLIENT,,}" = "none" ]; then
+  echo "[INFO] VPN_CLIENT is set to '${VPN_CLIENT}'. Skipping internal VPN setup."
+  echo "[INFO] This mode is intended for use with an external VPN container (e.g., gluetun sidecar)."
+  echo "[INFO] Ensure your network is already routed through a VPN before using this mode."
+  # Set a dummy interface for compatibility with rest of script
+  echo "external" > "$VPN_INTERFACE_FILE"
+  # Skip all VPN-related iptables setup
+  touch /tmp/vpn_setup_complete
+  echo "[INFO] External VPN mode - no iptables rules applied. Trust your sidecar's kill switch."
+  exit 0
 else
-  echo "[ERROR] Invalid VPN_CLIENT: $VPN_CLIENT. Must be 'openvpn' or 'wireguard'."
+  echo "[ERROR] Invalid VPN_CLIENT: $VPN_CLIENT. Must be 'openvpn', 'wireguard', 'external', or 'none'."
   exit 1
 fi
 
