@@ -83,9 +83,9 @@ case "$PROVIDER" in
     export VPN_CLIENT="openvpn"
     export VPN_CONFIG="$CONFIG_FILE"
 
-    # Write to s6 environment
-    echo "openvpn" > /run/s6/container_environment/VPN_CLIENT
-    echo "$CONFIG_FILE" > /run/s6/container_environment/VPN_CONFIG
+    # Write to s6 environment (use printf to avoid trailing newline)
+    printf "%s" "openvpn" > /run/s6/container_environment/VPN_CLIENT
+    printf "%s" "$CONFIG_FILE" > /run/s6/container_environment/VPN_CONFIG
 
     echo "[INFO] NordVPN setup complete"
     ;;
@@ -125,8 +125,8 @@ case "$PROVIDER" in
 
     export VPN_CLIENT="openvpn"
     export VPN_CONFIG="$CONFIG_FILE"
-    echo "openvpn" > /run/s6/container_environment/VPN_CLIENT
-    echo "$CONFIG_FILE" > /run/s6/container_environment/VPN_CONFIG
+    printf "%s" "openvpn" > /run/s6/container_environment/VPN_CLIENT
+    printf "%s" "$CONFIG_FILE" > /run/s6/container_environment/VPN_CONFIG
 
     echo "[INFO] Mullvad setup complete"
     ;;
@@ -174,8 +174,8 @@ case "$PROVIDER" in
 
     export VPN_CLIENT="openvpn"
     export VPN_CONFIG="$CONFIG_FILE"
-    echo "openvpn" > /run/s6/container_environment/VPN_CLIENT
-    echo "$CONFIG_FILE" > /run/s6/container_environment/VPN_CONFIG
+    printf "%s" "openvpn" > /run/s6/container_environment/VPN_CLIENT
+    printf "%s" "$CONFIG_FILE" > /run/s6/container_environment/VPN_CONFIG
 
     echo "[INFO] PIA setup complete"
     ;;
@@ -209,8 +209,8 @@ case "$PROVIDER" in
 
     export VPN_CLIENT="openvpn"
     export VPN_CONFIG="$CONFIG_FILE"
-    echo "openvpn" > /run/s6/container_environment/VPN_CLIENT
-    echo "$CONFIG_FILE" > /run/s6/container_environment/VPN_CONFIG
+    printf "%s" "openvpn" > /run/s6/container_environment/VPN_CLIENT
+    printf "%s" "$CONFIG_FILE" > /run/s6/container_environment/VPN_CONFIG
 
     echo "[INFO] Surfshark setup complete"
     ;;
