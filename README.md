@@ -205,12 +205,52 @@ kubectl apply -f https://raw.githubusercontent.com/magicalyak/nzbgetvpn/main/k8s
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `VPN_CLIENT` | VPN type (`openvpn` or `wireguard`) | `openvpn` |
+| `VPN_PROVIDER` | Auto-configure for provider (see below) | `nordvpn` |
 | `VPN_CONFIG` | Path to config file inside container | `/config/openvpn/provider.ovpn` |
 | `VPN_USER` | VPN username (OpenVPN) | `your_username` |
 | `VPN_PASS` | VPN password (OpenVPN) | `your_password` |
+| `VPN_COUNTRY` | Country code for auto-config | `us` |
 | `PUID` | User ID for file permissions | `1000` |
 | `PGID` | Group ID for file permissions | `1000` |
 | `TZ` | Timezone | `America/New_York` |
+
+## 🚀 Auto-Configuration with VPN Providers
+
+Set `VPN_PROVIDER` to automatically download and configure your VPN - no manual config files needed:
+
+```bash
+docker run -d \
+  --name nzbgetvpn \
+  --cap-add=NET_ADMIN \
+  --device=/dev/net/tun \
+  -p 6789:6789 \
+  -v ~/nzbgetvpn/config:/config \
+  -v ~/nzbgetvpn/downloads:/downloads \
+  -e VPN_PROVIDER=nordvpn \
+  -e VPN_USER=your_service_username \
+  -e VPN_PASS=your_service_password \
+  -e VPN_COUNTRY=us \
+  -e PUID=1000 \
+  -e PGID=1000 \
+  magicalyak/nzbgetvpn:latest
+```
+
+### Supported Providers
+
+| Provider | `VPN_PROVIDER` | Credentials Required |
+|----------|----------------|---------------------|
+| NordVPN | `nordvpn` | Service credentials (from account dashboard) |
+| Mullvad | `mullvad` | Account number |
+| PIA | `pia` | Username/password |
+| Surfshark | `surfshark` | Service credentials |
+
+### Provider-Specific Options
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `VPN_COUNTRY` | Country for server selection | `us`, `uk`, `de` |
+| `VPN_SERVER` | Specific server hostname | `us9591` |
+| `VPN_REGION` | Region (PIA) | `us_california` |
 
 ## ✅ Verify Everything Works
 
