@@ -42,11 +42,20 @@ case "$PROVIDER" in
       # Use recommended server API
       echo "[INFO] Fetching recommended NordVPN server for country: $NORD_COUNTRY"
 
-      # NordVPN API for recommended servers
-      API_URL="https://api.nordvpn.com/v1/servers/recommendations?filters[country_id]=${NORD_COUNTRY}&limit=1"
+      # NordVPN API requires numeric country ID, not country code
+      # First, lookup the country ID from the country code
+      COUNTRY_CODE_UPPER=$(echo "$NORD_COUNTRY" | tr '[:lower:]' '[:upper:]')
+      COUNTRY_ID=$(curl -sf "https://api.nordvpn.com/v1/servers/countries" 2>/dev/null | \
+        jq -r ".[] | select(.code == \"$COUNTRY_CODE_UPPER\") | .id" || true)
 
-      # Try to get recommended server
-      RECOMMENDED=$(curl -sf "$API_URL" 2>/dev/null | jq -r '.[0].hostname // empty' || true)
+      if [ -n "$COUNTRY_ID" ]; then
+        echo "[INFO] Country ID for $COUNTRY_CODE_UPPER: $COUNTRY_ID"
+        API_URL="https://api.nordvpn.com/v1/servers/recommendations?filters[country_id]=${COUNTRY_ID}&limit=1"
+        RECOMMENDED=$(curl -sf "$API_URL" 2>/dev/null | jq -r '.[0].hostname // empty' || true)
+      else
+        echo "[WARN] Could not lookup country ID for $NORD_COUNTRY"
+        RECOMMENDED=""
+      fi
 
       if [ -n "$RECOMMENDED" ]; then
         echo "[INFO] Recommended server: $RECOMMENDED"
