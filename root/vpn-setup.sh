@@ -359,11 +359,50 @@ elif [ "${VPN_CLIENT,,}" = "external" ] || [ "${VPN_CLIENT,,}" = "none" ]; then
   echo "[INFO] VPN_CLIENT is set to '${VPN_CLIENT}'. Skipping internal VPN setup."
   echo "[INFO] This mode is intended for use with an external VPN container (e.g., gluetun sidecar)."
   echo "[INFO] Ensure your network is already routed through a VPN before using this mode."
-  # Set a dummy interface for compatibility with rest of script
+
+  # Set external mode marker
   echo "external" > "$VPN_INTERFACE_FILE"
-  # Skip all VPN-related iptables setup
+  touch /tmp/vpn_external_mode
+
+  # Wait for external VPN to be ready and record initial VPN IP
+  echo "[INFO] Waiting for external VPN connection..."
+  EXTERNAL_VPN_READY=false
+  for i in $(seq 1 30); do
+    CURRENT_IP=$(curl -sf --max-time 5 ifconfig.me 2>/dev/null || true)
+    if [ -n "$CURRENT_IP" ]; then
+      echo "[INFO] External IP detected: $CURRENT_IP"
+      # Record this as our expected VPN IP for leak detection
+      echo "$CURRENT_IP" > /tmp/expected_vpn_ip
+      echo "$CURRENT_IP" > /tmp/last_external_ip
+      EXTERNAL_VPN_READY=true
+      break
+    fi
+    echo "[INFO] Waiting for network... ($i/30)"
+    sleep 2
+  done
+
+  if [ "$EXTERNAL_VPN_READY" = "false" ]; then
+    echo "[ERROR] Could not detect external IP. External VPN may not be ready."
+    exit 1
+  fi
+
+  # Enable IP leak checking for external mode by default
+  echo "[INFO] Enabling VPN monitoring for external mode..."
+  echo "true" > /run/s6/container_environment/CHECK_IP_LEAK 2>/dev/null || true
+  echo "true" > /run/s6/container_environment/CHECK_VPN_CONNECTIVITY 2>/dev/null || true
+  echo "true" > /run/s6/container_environment/EXTERNAL_VPN_MODE 2>/dev/null || true
+
+  # Export for current session
+  export CHECK_IP_LEAK=true
+  export CHECK_VPN_CONNECTIVITY=true
+  export EXTERNAL_VPN_MODE=true
+
   touch /tmp/vpn_setup_complete
-  echo "[INFO] External VPN mode - no iptables rules applied. Trust your sidecar's kill switch."
+  echo "[INFO] External VPN mode configured."
+  echo "[INFO] - VPN IP recorded: $(cat /tmp/expected_vpn_ip)"
+  echo "[INFO] - IP leak detection: enabled"
+  echo "[INFO] - NZBGet will be stopped if VPN connection is lost"
+  echo "[INFO] --- End of vpn-setup.sh (external mode) ---"
   exit 0
 else
   echo "[ERROR] Invalid VPN_CLIENT: $VPN_CLIENT. Must be 'openvpn', 'wireguard', 'external', or 'none'."
