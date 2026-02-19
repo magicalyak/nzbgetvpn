@@ -1,0 +1,6 @@
+- Custom NZBGet container with built-in VPN (OpenVPN/WireGuard) support
+- Base image: ghcr.io/linuxserver/nzbget (pinned version in Dockerfile)
+- Built and published via GitHub Actions (build-and-publish.yml) to docker.io/magicalyak/nzbgetvpn
+- Deployed to k3s cluster in the media namespace via Flux GitOps (rocky repo: cluster/apps/media/nzbget.yaml)
+- Flux image automation tracks new tags and auto-updates the deployment
+- Version checker in rocky repo monitors upstream linuxserver/nzbget for new releases
