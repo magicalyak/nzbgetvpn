@@ -25,6 +25,29 @@ update_nzb_config() {
   fi
 }
 
+# Function to set a default config value only if the key doesn't already exist.
+# Preserves user-customized values across container restarts.
+# Usage: set_nzb_default "ConfigKey" "DefaultValue" "/path/to/nzbget.conf"
+set_nzb_default() {
+  local key="$1"
+  local default_value="$2"
+  local config_file="$3"
+
+  if [ ! -f "$config_file" ]; then
+    echo "NZBGet config: $config_file not found. Skipping default for $key."
+    return
+  fi
+
+  local escaped_key=$(printf '%s\n' "$key" | sed 's/[.^$*[\]]/\\&/g')
+
+  if grep -q -E "^${escaped_key}[[:space:]]*=" "$config_file"; then
+    echo "NZBGet config: $key already set, preserving existing value"
+  else
+    echo "${key}=${default_value}" >> "$config_file"
+    echo "NZBGet config: Set default $key=${default_value}"
+  fi
+}
+
 # Function to remove specific NZBGet config lines by literal key match
 # Usage: remove_nzb_config_literal_key "Server1.SSL" "/path/to/nzbget.conf"
 remove_nzb_config_literal_key() {
@@ -63,15 +86,15 @@ if [ ! -f "$NZBGET_CONF_FILE" ]; then
   echo "NZBGet config: CRITICAL - $NZBGET_CONF_FILE does not exist when 99-script started. LSIO base scripts should have created this. Cannot apply custom server settings reliably."
 fi
 
-echo "NZBGet config: Applying PATH settings..."
-update_nzb_config "MainDir" "/downloads" "$NZBGET_CONF_FILE"
-update_nzb_config "DestDir" "/downloads/completed" "$NZBGET_CONF_FILE"
-update_nzb_config "InterDir" "/downloads/intermediate" "$NZBGET_CONF_FILE"
-update_nzb_config "ScriptDir" "/config/scripts" "$NZBGET_CONF_FILE" # Standard LSIO location for scripts
-update_nzb_config "QueueDir" "/downloads/queue" "$NZBGET_CONF_FILE"
-update_nzb_config "TempDir" "/downloads/tmp" "$NZBGET_CONF_FILE"
-update_nzb_config "NzbDir" "/downloads/nzb" "$NZBGET_CONF_FILE"
-update_nzb_config "LogFile" "/config/nzbget.log" "$NZBGET_CONF_FILE"
+echo "NZBGet config: Applying PATH defaults (preserving any user-customized values)..."
+set_nzb_default "MainDir" "/downloads" "$NZBGET_CONF_FILE"
+set_nzb_default "DestDir" "/downloads/completed" "$NZBGET_CONF_FILE"
+set_nzb_default "InterDir" "/downloads/intermediate" "$NZBGET_CONF_FILE"
+set_nzb_default "ScriptDir" "/config/scripts" "$NZBGET_CONF_FILE"
+set_nzb_default "QueueDir" "/downloads/queue" "$NZBGET_CONF_FILE"
+set_nzb_default "TempDir" "/downloads/tmp" "$NZBGET_CONF_FILE"
+set_nzb_default "NzbDir" "/downloads/nzb" "$NZBGET_CONF_FILE"
+set_nzb_default "LogFile" "/config/nzbget.log" "$NZBGET_CONF_FILE"
 
 echo "NZBGet config: Applying Server1 settings from environment variables if set..."
 
