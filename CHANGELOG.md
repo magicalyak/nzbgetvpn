@@ -2,6 +2,14 @@
 
 All notable changes to nzbgetvpn will be documented in this file.
 
+## [v26.0.1] - 2026-03-08
+
+### Fixed
+- **Preserve custom paths on restart**: Path settings (MainDir, DestDir, InterDir, etc.) configured through the NZBGet UI are no longer overwritten when the container restarts. The init script now only sets defaults for paths that haven't been configured yet. Fixes #20.
+
+### Updated
+- **Base Image**: Updated to LinuxServer NZBGet v26.0-ls233 (from v26.0-ls231)
+
 ## [v26.0.0] - 2026-02-15
 
 ### Updated
