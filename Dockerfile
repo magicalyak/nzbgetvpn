@@ -3,8 +3,8 @@
 
 # Use specific version tag for reproducibility and attestation
 # LinuxServer base already handles non-root user via PUID/PGID
-# Base image: NZBGet v26.0 (LinuxServer build ls231)
-FROM ghcr.io/linuxserver/nzbget:v26.0-ls234
+# Base image: NZBGet v26.0 (LinuxServer build ls235)
+FROM ghcr.io/linuxserver/nzbget:v26.0-ls235
 
 # Build arguments for multi-architecture support
 ARG BUILDPLATFORM
