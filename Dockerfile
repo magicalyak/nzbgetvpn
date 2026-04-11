@@ -3,8 +3,8 @@
 
 # Use specific version tag for reproducibility and attestation
 # LinuxServer base already handles non-root user via PUID/PGID
-# Base image: NZBGet v26.0 (LinuxServer build ls235)
-FROM ghcr.io/linuxserver/nzbget:v26.0-ls235
+# Base image: NZBGet v26.1 (LinuxServer build ls238)
+FROM ghcr.io/linuxserver/nzbget:v26.1-ls238
 
 # Build arguments for multi-architecture support
 ARG BUILDPLATFORM
@@ -176,7 +176,7 @@ LABEL org.opencontainers.image.title="nzbgetvpn" \
       org.opencontainers.image.created="${BUILD_DATE}" \
       org.opencontainers.image.revision="${VCS_REF}" \
       org.opencontainers.image.version="${VERSION}" \
-      org.opencontainers.image.base.name="ghcr.io/linuxserver/nzbget:v26.0-ls234"
+      org.opencontainers.image.base.name="ghcr.io/linuxserver/nzbget:v26.1-ls238"
 
 # Non-root user handling:
 # The LinuxServer base image already provides proper non-root user functionality
