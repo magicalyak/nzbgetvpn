@@ -27,7 +27,7 @@ jobs:
 
       - name: Simulate Tag Generation for Main Branch
         id: main-tags
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: |
             ${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }}
@@ -45,7 +45,7 @@ jobs:
 
       - name: Simulate Tag Generation for Release Tag
         id: release-tags
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: |
             ${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }}
@@ -65,7 +65,7 @@ jobs:
 
       - name: Simulate Release Candidate Tags
         id: rc-tags
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: |
             ${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME }}
