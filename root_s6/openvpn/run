@@ -2,10 +2,17 @@
 # shellcheck disable=SC1008
 # s6-rc script for OpenVPN
 
-# Exit if VPN is not enabled or not OpenVPN
+# Exit if VPN is not enabled or not OpenVPN.
+# The service is registered as a longrun, so s6-supervise will respawn
+# this script even after exit 111. Use a flag file to silence the
+# "disabled" log after the first run (mirrors the privoxy/run pattern).
 if [[ "${VPN_CLIENT,,}" != "openvpn" ]]; then
-  echo "[INFO] OpenVPN service disabled (VPN_CLIENT is not 'openvpn')"
-  exit 111 # Exit with 111 to tell s6-rc this service is permanently down
+  FLAG_FILE="/tmp/openvpn-disabled-message-shown"
+  if [[ ! -f "$FLAG_FILE" ]]; then
+    echo "[INFO] OpenVPN service disabled (VPN_CLIENT is not 'openvpn'). Exiting openvpn service script."
+    touch "$FLAG_FILE"
+  fi
+  exit 111 # Tell s6-rc this service is permanently down
 fi
 
 # Wait for VPN setup to complete

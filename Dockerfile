@@ -91,6 +91,7 @@ RUN apk add --no-cache \
     curl \
     iproute2 \
     wireguard-tools \
+    openresolv \
     privoxy \
     python3 \
     py3-psutil \
