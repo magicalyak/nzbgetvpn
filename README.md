@@ -159,6 +159,7 @@ services:
     ports:
       - "6789:6789"        # NZBGet Web UI
       - "8080:8080"        # Monitoring (optional)
+      # - "8118:8118"      # Privoxy (uncomment if ENABLE_PRIVOXY=yes)
     volumes:
       - ./config:/config
       - ./downloads:/downloads
@@ -632,12 +633,40 @@ docker run -d \
 - `NOTIFICATION_WEBHOOK_URL` - Discord/Slack webhooks
 
 **Privoxy (Optional):**
-- `ENABLE_PRIVOXY` - Enable HTTP proxy
-- `PRIVOXY_PORT` - Proxy port
+- `ENABLE_PRIVOXY` - Enable HTTP proxy (`yes`/`no`, default `no`)
+- `PRIVOXY_PORT` - Proxy port (default `8118`)
+
+> **Note:** Privoxy is disabled by default. Enabling it is a two-step change: set `ENABLE_PRIVOXY=yes` **and** publish the port in `docker-compose.yml` (e.g. `- "8118:8118"`). Publishing the port alone does nothing — the s6-rc service exits at startup unless `ENABLE_PRIVOXY` is set. See [Optional: Privoxy HTTP Proxy](#-optional-privoxy-http-proxy) below for details.
 
 See [.env.sample](.env.sample) for complete list with examples.
 
 </details>
+
+## 🌐 Optional: Privoxy HTTP Proxy
+
+The image bundles [Privoxy](https://www.privoxy.org/) so you can route browser or client HTTP traffic through the same VPN tunnel as NZBGet. It is **disabled by default**. Enabling it requires two changes:
+
+**1. Enable the service** in your `.env`:
+
+```bash
+ENABLE_PRIVOXY=yes
+PRIVOXY_PORT=8118    # optional, defaults to 8118
+```
+
+**2. Publish the port** in `docker-compose.yml`:
+
+```yaml
+ports:
+  - "6789:6789"      # NZBGet Web UI
+  - "8118:8118"      # Privoxy (must match PRIVOXY_PORT)
+```
+
+That's it. On startup the container generates `/etc/privoxy/config` from a template, starts Privoxy under s6 supervision, and `vpn-setup.sh` adds the iptables rules so traffic to port 8118 enters via `eth0` and replies route back out the LAN interface (not the VPN). Configure your browser or HTTP client to use `http://<docker-host>:8118` as an HTTP proxy and outbound traffic will exit through your VPN provider.
+
+**Notes:**
+- If you set `PRIVOXY_PORT` to a non-default value (e.g. `8119`), publish the matching port mapping in compose.
+- If publishing the port without `ENABLE_PRIVOXY=yes`, the s6-rc privoxy service exits at startup with a one-time log message and nothing listens on the port.
+- Custom filter/action files can be dropped in `/config/privoxy/`; otherwise built-in defaults are used. Set `PRIVOXY_SKIP_FILE_SETUP=yes` to disable automatic file management.
 
 ## 🛠️ Building Fixed Version
 
