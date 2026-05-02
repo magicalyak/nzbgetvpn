@@ -2,6 +2,15 @@
 
 All notable changes to nzbgetvpn will be documented in this file.
 
+## [v26.1.1] - 2026-05-02
+
+### Fixed
+- **WireGuard DNS resolution**: `wg-quick` shells out to `resolvconf` when processing the `DNS = ...` line in WireGuard configs. Without `openresolv` installed that step failed, leaving the tunnel partially up and the killswitch blocking everything else, presenting as ping/DNS dead. Added `openresolv` to the Alpine package list so `wg-quick` can update `/etc/resolv.conf` properly.
+- **OpenVPN s6 log spam**: The OpenVPN s6 run script returned exit 111 when `VPN_CLIENT` was not `openvpn`, but the service is registered as a longrun, so s6-supervise respawned it and reprinted the disabled message in a tight loop. Mirrored the flag-file pattern from `privoxy/run` to silence the message after the first run.
+
+### Documentation
+- **Privoxy two-step enable**: Expanded the README so the `ENABLE_PRIVOXY=yes` env requirement is explicit alongside the port mapping. The previous wording made it easy to assume publishing port 8118 was sufficient.
+
 ## [v26.0.1] - 2026-03-08
 
 ### Fixed
