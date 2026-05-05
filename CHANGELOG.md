@@ -2,6 +2,14 @@
 
 All notable changes to nzbgetvpn will be documented in this file.
 
+## [v26.1.2] - 2026-05-03
+
+### Fixed
+- **iptables flush no longer wipes WireGuard / OpenVPN PostUp rules**: `vpn-setup.sh` now resets policies to ACCEPT and flushes `INPUT/FORWARD/OUTPUT/nat/mangle` *before* bringing the tunnel up, then re-applies the strict-DROP killswitch policies after. Previously the flush ran *after* `wg-quick up` / `openvpn`, which discarded any iptables rules installed by `PostUp =` hooks in user-supplied WireGuard configs (or `up` scripts in OpenVPN configs) — common in provider-supplied templates. The killswitch end-state is unchanged (default DROP, explicit ACCEPT for tunnel interface, server endpoint, loopback, established/related, configured UI ports, optional `LAN_NETWORK` / `ADDITIONAL_PORTS`).
+
+### Security
+- **IPv6 killswitch added**: `vpn-setup.sh` now sets `ip6tables -P INPUT/OUTPUT/FORWARD DROP` with explicit ACCEPT for loopback and established/related connections only. Closes a real leak: if the host advertised an IPv6 default route, IPv6 traffic could egress on `eth0` outside the tunnel because no `ip6tables` rules were applied. Soft-fails on kernels without `CONFIG_IP6_NF_IPTABLES`.
+
 ## [v26.1.1] - 2026-05-02
 
 ### Fixed
