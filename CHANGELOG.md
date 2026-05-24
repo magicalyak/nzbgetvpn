@@ -2,6 +2,11 @@
 
 All notable changes to nzbgetvpn will be documented in this file.
 
+## [v26.1.3] - 2026-05-24
+
+### Updated
+- **Base Image**: Updated to LinuxServer NZBGet v26.1-ls244 (from v26.1-ls238). Picks up upstream baselayer rebuilds; no NZBGet version change.
+
 ## [v26.1.2] - 2026-05-03
 
 ### Fixed
