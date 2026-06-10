@@ -2,6 +2,14 @@
 
 All notable changes to nzbgetvpn will be documented in this file.
 
+## [v26.1.4] - 2026-06-10
+
+### Updated
+- **Base Image**: Updated to LinuxServer NZBGet v26.1-ls247 (from v26.1-ls244). Picks up three upstream baselayer rebuilds worth of package/security updates; no NZBGet version change.
+
+### Fixed
+- Corrected the stale `org.opencontainers.image.base.name` label, which still referenced `v26.1-ls238` after prior base bumps.
+
 ## [v26.1.3] - 2026-05-24
 
 ### Updated
