@@ -2,6 +2,14 @@
 
 All notable changes to nzbgetvpn will be documented in this file.
 
+## [v26.1.5] - 2026-06-17
+
+### Updated
+- **Base Image**: Updated to LinuxServer NZBGet v26.1-ls248 (from v26.1-ls247). Picks up one upstream baselayer rebuild worth of package/security updates; no NZBGet version change.
+
+### CI
+- Brought GitHub Actions workflows up to date with the transmissionvpn sibling repo (resolves dependabot PRs #23–27): `actions/checkout` v5→v6, `actions/upload-artifact` v4→v7, `actions/download-artifact` v4→v8, `docker/setup-buildx-action` v3→v4, `docker/setup-qemu-action` v3→v4, `docker/login-action` v3→v4, `docker/metadata-action` v5→v6, `docker/build-push-action` v6→v7, `aquasecurity/trivy-action` 0.35.0→0.36.0.
+
 ## [v26.1.4] - 2026-06-10
 
 ### Updated
