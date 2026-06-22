@@ -2,6 +2,11 @@
 
 All notable changes to nzbgetvpn will be documented in this file.
 
+## [v26.2.1] - 2026-06-22
+
+### Added
+- **Docker secrets support for VPN credentials**: `find_vpn_credentials` now reads `FILE__VPN_USER` and `FILE__VPN_PASS` (paths to secret files) as the highest-priority credential source, ahead of the `VPN_USER`/`VPN_PASS` environment variables and the on-disk credentials file. Brings credential handling to parity with the transmissionvpn sibling image so the same secret-mounting patterns work across both.
+
 ## [v26.2.0] - 2026-06-19
 
 ### Updated
