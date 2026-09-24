@@ -124,6 +124,7 @@ COPY root/etc/cont-init.d/01-ensure-vpn-config-dirs.sh /etc/cont-init.d/01-ensur
 COPY root/etc/cont-init.d/02-vpn-provider-setup.sh /etc/cont-init.d/02-vpn-provider-setup
 COPY root/etc/cont-init.d/99-nzbget-news-server-override.sh /etc/cont-init.d/99-nzbget-news-server-override
 COPY root/vpn-setup.sh /etc/cont-init.d/50-vpn-setup
+COPY root/vpn-remotes.sh /usr/local/bin/vpn-remotes.sh
 
 # Copy enhanced healthcheck and monitoring scripts
 COPY root/healthcheck.sh /root/healthcheck.sh

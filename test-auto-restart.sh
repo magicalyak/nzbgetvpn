@@ -210,6 +210,31 @@ expect "timeout logged" "$(grep -c 'has not completed after' "$RESTART_LOG")" 1
 teardown
 
 echo
+echo "A VPN restart reruns setup without the setup flag, and waits for the tunnel"
+setup
+# The setup stub records whether the flag was still there (OpenVPN would have
+# started early), recreates it like the real script, and leaves the tunnel coming
+# up two probes later.
+cat > "$VPN_SETUP_SCRIPT" <<STUB
+#!/bin/sh
+[ -f "$VPN_SETUP_FLAG" ] && echo present > "$T/flag-during-setup"
+touch "$VPN_SETUP_FLAG"
+echo 2 > "$T/dead-probes"
+STUB
+cat > "$T/tunnel-after-setup" <<'STUB'
+n=$(cat "$T/dead-probes" 2>/dev/null || echo 0)
+if [ "$n" -gt 0 ]; then echo $((n - 1)) > "$T/dead-probes"; echo dead > "$T/tunnel"; else echo ok > "$T/tunnel"; fi
+STUB
+# Each health check run after setup consumes one dead probe.
+sed -i "2i T=$T; [ -f \$T/dead-probes ] && . \$T/tunnel-after-setup" "$HEALTHCHECK_SCRIPT"
+tunnel dead; pass; pass; pass
+expect "restart attempted" "$(vpn_restarts)" 1
+expect "setup flag removed before setup reran" "$(cat "$T/flag-during-setup" 2>/dev/null || echo absent)" absent
+expect "setup flag back afterwards" "$([[ -f $VPN_SETUP_FLAG ]] && echo yes || echo no)" yes
+expect "restart verified once traffic passes" "$(grep -c 'VPN restart verification successful after 30s' "$RESTART_LOG")" 1
+teardown
+
+echo
 echo "================================================"
 echo "passed=$PASSED failed=$FAILED"
 [[ $FAILED -eq 0 ]]
