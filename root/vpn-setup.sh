@@ -590,44 +590,67 @@ if [ "${VPN_CLIENT,,}" = "openvpn" ]; then
   TEMP_OVPN_CONFIG="/tmp/config.ovpn"
   
   if [ -f "$TEMP_OVPN_CONFIG" ]; then
-    # Extract remote server and port from OpenVPN config
-    VPN_SERVER_INFO=$(grep -E "^remote " "$TEMP_OVPN_CONFIG" | head -1)
-    if [ -n "$VPN_SERVER_INFO" ]; then
-      VPN_SERVER_HOST=$(echo "$VPN_SERVER_INFO" | awk '{print $2}')
-      VPN_SERVER_PORT=$(echo "$VPN_SERVER_INFO" | awk '{print $3}')
-      VPN_SERVER_PROTO=$(echo "$VPN_SERVER_INFO" | awk '{print $4}')
-      
-      # Default to UDP port 1194 if not specified
-      [ -z "$VPN_SERVER_PORT" ] && VPN_SERVER_PORT="1194"
-      [ -z "$VPN_SERVER_PROTO" ] && VPN_SERVER_PROTO="udp"
-      
+    # Allow every remote, not just the first. OpenVPN falls through the list on
+    # connection failure (and shuffles it with remote-random), so a remote
+    # without an exception can never connect and the fallbacks are dead.
+    # A remote line is "remote HOST [PORT] [PROTO]"; missing fields come from
+    # the global port/proto directives, then OpenVPN's defaults (1194, udp).
+    DEFAULT_VPN_PORT=$(awk '$1 == "port" { print $2; exit }' "$TEMP_OVPN_CONFIG" | tr -d '\r')
+    DEFAULT_VPN_PROTO=$(awk '$1 == "proto" { print $2; exit }' "$TEMP_OVPN_CONFIG" | tr -d '\r')
+    [ -z "$DEFAULT_VPN_PORT" ] && DEFAULT_VPN_PORT="1194"
+    [ -z "$DEFAULT_VPN_PROTO" ] && DEFAULT_VPN_PROTO="udp"
+
+    VPN_REMOTE_COUNT=0
+    VPN_EXCEPTION_COUNT=0
+    while read -r _ VPN_SERVER_HOST VPN_SERVER_PORT VPN_SERVER_PROTO _; do
+      [ -z "$VPN_SERVER_HOST" ] && continue
+      VPN_REMOTE_COUNT=$((VPN_REMOTE_COUNT + 1))
+      [ -z "$VPN_SERVER_PORT" ] && VPN_SERVER_PORT="$DEFAULT_VPN_PORT"
+      [ -z "$VPN_SERVER_PROTO" ] && VPN_SERVER_PROTO="$DEFAULT_VPN_PROTO"
+      # OpenVPN accepts udp4, udp6, tcp-client, tcp4 and so on; iptables wants udp or tcp.
+      case "${VPN_SERVER_PROTO,,}" in
+        tcp*) VPN_SERVER_PROTO="tcp" ;;
+        *) VPN_SERVER_PROTO="udp" ;;
+      esac
+
       echo "[INFO] VPN server: $VPN_SERVER_HOST:$VPN_SERVER_PORT ($VPN_SERVER_PROTO)"
-      
-      # Resolve hostname to IP if needed (DNS should work at this point)
+
+      # Resolve hostname to IPs if needed (DNS should work at this point).
+      # Every IPv4 address is allowed because OpenVPN may use any of them.
       if echo "$VPN_SERVER_HOST" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
-        VPN_SERVER_IP="$VPN_SERVER_HOST"
+        VPN_SERVER_IPS="$VPN_SERVER_HOST"
       else
         echo "[INFO] Resolving VPN server hostname: $VPN_SERVER_HOST"
         # Filter out invalid IPv6 addresses like "::" and only get valid IPv4 addresses
-        VPN_SERVER_IP=$(nslookup "$VPN_SERVER_HOST" | awk '/^Address: / { print $2 }' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
-        if [ -z "$VPN_SERVER_IP" ]; then
+        VPN_SERVER_IPS=$(nslookup "$VPN_SERVER_HOST" 2>/dev/null | awk '/^Address: / { print $2 }' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | sort -u || true)
+        if [ -z "$VPN_SERVER_IPS" ]; then
           # Fallback to getent hosts, also filtering for IPv4
-          VPN_SERVER_IP=$(getent hosts "$VPN_SERVER_HOST" | awk '{print $1}' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+          VPN_SERVER_IPS=$(getent ahostsv4 "$VPN_SERVER_HOST" 2>/dev/null | awk '{print $1}' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | sort -u || true)
         fi
       fi
-      
-      if [ -n "$VPN_SERVER_IP" ]; then
+
+      if [ -z "$VPN_SERVER_IPS" ]; then
+        echo "[WARN] Could not resolve VPN server IP for $VPN_SERVER_HOST. OpenVPN will not be able to use this remote."
+        continue
+      fi
+      for VPN_SERVER_IP in $VPN_SERVER_IPS; do
+        # The same address can appear on more than one remote line.
+        if iptables -C OUTPUT -d "$VPN_SERVER_IP" -p "$VPN_SERVER_PROTO" --dport "$VPN_SERVER_PORT" -j ACCEPT 2>/dev/null; then
+          continue
+        fi
         echo "[INFO] Adding kill switch exception for VPN server: $VPN_SERVER_IP:$VPN_SERVER_PORT ($VPN_SERVER_PROTO)"
         iptables -A OUTPUT -d "$VPN_SERVER_IP" -p "$VPN_SERVER_PROTO" --dport "$VPN_SERVER_PORT" -j ACCEPT
-        echo "[INFO] VPN server connectivity exception added successfully"
-      else
-        echo "[WARN] Could not resolve VPN server IP for $VPN_SERVER_HOST. VPN connection may fail to establish."
-      fi
-    else
+        VPN_EXCEPTION_COUNT=$((VPN_EXCEPTION_COUNT + 1))
+      done
+    done < <(grep -E '^[[:space:]]*remote[[:space:]]' "$TEMP_OVPN_CONFIG" | tr -d '\r')
+
+    if [ "$VPN_REMOTE_COUNT" -eq 0 ]; then
       echo "[WARN] No 'remote' directive found in OpenVPN config. Using fallback exception for common VPN ports."
       # Fallback: allow common OpenVPN ports
       iptables -A OUTPUT -p udp --dport 1194 -j ACCEPT
       iptables -A OUTPUT -p tcp --dport 1194 -j ACCEPT
+    else
+      echo "[INFO] Added $VPN_EXCEPTION_COUNT kill switch exception(s) for $VPN_REMOTE_COUNT OpenVPN remote(s)"
     fi
   else
     echo "[WARN] OpenVPN config file not found at $TEMP_OVPN_CONFIG. Adding fallback VPN port exceptions."
