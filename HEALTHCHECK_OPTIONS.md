@@ -204,7 +204,7 @@ HEALTH_CHECK_TIMEOUT=30
 
 ## 📈 **Metrics and Monitoring**
 
-When `METRICS_ENABLED=true`, the system collects detailed metrics:
+The Prometheus endpoint always exports per-check response times and success rates, computed from the health checks the monitoring server runs every `HEALTH_CHECK_INTERVAL` seconds. `METRICS_ENABLED=true` additionally keeps a JSON history of individual check records in `/config/metrics.json`:
 
 ### **Available Metrics**
 - **Response times** for all health checks
@@ -217,11 +217,11 @@ When `METRICS_ENABLED=true`, the system collects detailed metrics:
 
 ### **Accessing Metrics**
 ```bash
-# JSON metrics endpoint
+# Prometheus metrics endpoint (/prometheus serves the same thing)
 curl http://localhost:8080/metrics
 
-# Prometheus metrics endpoint
-curl http://localhost:8080/prometheus
+# JSON history endpoint (needs METRICS_ENABLED=true)
+curl http://localhost:8080/metrics.json
 
 # Health status endpoint
 curl http://localhost:8080/health

@@ -399,18 +399,23 @@ scrape_configs:
   - job_name: 'nzbgetvpn-metrics'
     static_configs:
       - targets: ['your-host:8080']
-    metrics_path: '/prometheus'
+    metrics_path: '/metrics'
     scrape_interval: 30s
 ```
+
+`/prometheus` serves the same exposition, so existing scrape configs keep working.
 
 ### Available Endpoints
 
 | Endpoint | Description | Format |
 |----------|-------------|--------|
-| `/health` | Current health status | JSON |
-| `/prometheus` | Prometheus metrics | Text |
+| `/metrics` | Prometheus metrics | Text |
+| `/prometheus` | Same as `/metrics` | Text |
+| `/health` | Current health status (503 when unhealthy, degraded or stale) | JSON |
 | `/status` | Detailed system info | JSON |
-| `/metrics` | Historical metrics | JSON |
+| `/metrics.json` | Historical check records (needs `METRICS_ENABLED=true`) | JSON |
+
+The monitoring server runs the health check itself every `HEALTH_CHECK_INTERVAL` seconds (default 30) and scrapes read the cached result, so a scrape never waits on network probes. This also means health data exists under Kubernetes, which ignores the Dockerfile `HEALTHCHECK`.
 
 ### Example Health Response
 
@@ -434,12 +439,34 @@ scrape_configs:
 
 ### Prometheus Metrics
 
-The container provides these key metrics:
+| Metric | Meaning |
+|--------|---------|
+| `nzbgetvpn_healthy` | 1 when the latest health check is fresh and reported `healthy`. Alert on this. |
+| `nzbgetvpn_vpn_connected` | 1 when traffic actually passes through the tunnel: an ICMP probe bound to the VPN interface (`VPN_PROBE_HOST`, falling back to `VPN_PROBE_HOST_FALLBACK`) got a reply. Omitted when `CHECK_VPN_CONNECTIVITY=false`. |
+| `nzbgetvpn_vpn_interface_up` | 1 when the VPN interface is up and has an address. This does **not** mean traffic passes; a dead tunnel usually keeps its address. |
+| `nzbgetvpn_check{check="..."}` | Result of each check in the latest run (1 pass, 0 fail). Checks that did not run are omitted. |
+| `nzbgetvpn_response_time_seconds{check="..."}` | How long each check took in the latest run |
+| `nzbgetvpn_success_rate_percent{check="..."}` | Share of the last `SUCCESS_RATE_WINDOW` runs (default 20) in which each check passed |
+| `nzbgetvpn_health_check_timestamp_seconds` | When the latest health check finished |
+| `nzbgetvpn_health_check` | Deprecated alias of `nzbgetvpn_healthy` |
 
-- `nzbgetvpn_health_check` - Overall health (1=healthy, 0=unhealthy)
-- `nzbgetvpn_check{check="service"}` - Individual service status
-- `nzbgetvpn_response_time_seconds` - Response times for health checks
-- `nzbgetvpn_success_rate_percent` - Success rates by service
+System gauges (`nzbgetvpn_memory_usage_percent`, `nzbgetvpn_cpu_usage_percent`, `nzbgetvpn_load_average`, `nzbgetvpn_start_time`, `nzbgetvpn_external_ip_info`) are unchanged.
+
+A result older than `HEALTH_STATUS_MAX_AGE` seconds (default 180) reports `nzbgetvpn_healthy` and `nzbgetvpn_vpn_connected` as 0, so a probe that stops running cannot keep reporting its last good result.
+
+Example alert rules:
+
+```yaml
+- alert: NZBGetVPNUnhealthy
+  expr: nzbgetvpn_healthy == 0
+  for: 5m
+- alert: NZBGetVPNTunnelDown
+  expr: nzbgetvpn_vpn_connected == 0
+  for: 5m
+- alert: NZBGetNewsServerDown
+  expr: nzbgetvpn_success_rate_percent{check="news_server"} < 50
+  for: 10m
+```
 
 ### Docker Compose with Monitoring Stack
 
@@ -545,14 +572,21 @@ ENABLE_MONITORING=yes
 MONITORING_PORT=8080
 ENABLE_AUTO_RESTART=true
 RESTART_COOLDOWN_SECONDS=300
+MAX_RESTART_ATTEMPTS=3
+EXIT_ON_MAX_RESTARTS=true
 NOTIFICATION_WEBHOOK_URL=https://discord.com/api/webhooks/YOUR_WEBHOOK
 ```
 
 **Auto-restart features:**
-- Automatically restarts VPN connection if it fails
-- Monitors NZBGet health and restarts if needed
-- Configurable cooldown periods to prevent restart loops
+- Restarts the VPN when the tunnel stops passing traffic, not only when the interface disappears
+- Monitors NZBGet health and restarts it through s6 if needed
+- Acts only after `RESTART_FAILURE_THRESHOLD` consecutive failed checks, so one dropped probe does not bounce the tunnel
+- Cooldown between restarts to prevent restart loops
 - Discord/Slack notifications for service events
+
+**When restarts run out:** once a service has been restarted `MAX_RESTART_ATTEMPTS` times without recovering, the container exits with code 1 (`EXIT_ON_MAX_RESTARTS=true`, the default). Docker restart policies and Kubernetes then replace it. Without this the watchdog would stop trying while the web UI stayed up, and a TCP liveness probe on port 6789 would never notice. Set `EXIT_ON_MAX_RESTARTS=false` to keep the old behaviour of logging and waiting.
+
+A restart counter resets only after `HEALTHY_CHECKS_BEFORE_RESET` consecutive passing checks (default 5), so a tunnel that comes back for a single check between failures still runs out of attempts. With the defaults, a tunnel that stays dead is restarted three times and the container exits about 17 minutes after the tunnel died.
 
 ## 🏗️ Multi-Architecture Support
 
@@ -603,11 +637,7 @@ docker run -d \
 - `NAME_SERVERS` - Custom DNS servers
 
 **VPN Kill Switch & Security:**
-- `VPN_CHECK_INTERVAL` - Seconds between VPN health checks (default: 30)
-- `VPN_MAX_FAILURES` - Max consecutive failures before stopping NZBGet (default: 3)
-- `CHECK_DNS` - Enable DNS resolution testing (default: false)
-- `CHECK_EXTERNAL_IP` - Check external IP through VPN (default: false)
-- `AUTO_RESTART_VPN` - Auto-restart VPN on failure (default: false)
+- `VPN_CHECK_INTERVAL`, `VPN_MAX_FAILURES`, `CHECK_DNS`, `CHECK_EXTERNAL_IP`, `AUTO_RESTART_VPN` - Read only by `root/vpn-monitor.sh`, which the image does not currently install, so they have no effect. Use the auto-restart settings below instead.
 
 **System Settings:**
 - `PUID` / `PGID` - User/Group IDs
@@ -628,8 +658,17 @@ docker run -d \
 **Monitoring & Auto-Restart:**
 - `ENABLE_MONITORING` - Enable HTTP monitoring
 - `MONITORING_PORT` - Monitoring server port
-- `ENABLE_AUTO_RESTART` - Auto-restart failed services
-- `RESTART_COOLDOWN_SECONDS` - Restart delay
+- `HEALTH_CHECK_INTERVAL` - Seconds between health checks run by the monitoring server (default: 30)
+- `HEALTH_STATUS_MAX_AGE` - Seconds after which a health result counts as stale and unhealthy (default: 180)
+- `SUCCESS_RATE_WINDOW` - Runs used for `nzbgetvpn_success_rate_percent` (default: 20)
+- `VPN_PROBE_HOST` / `VPN_PROBE_HOST_FALLBACK` - Targets pinged through the VPN interface to test the tunnel (default: `1.1.1.1` / `9.9.9.9`)
+- `ENABLE_AUTO_RESTART` - Auto-restart failed services (default: false)
+- `RESTART_COOLDOWN_SECONDS` - Minimum seconds between restarts of a service (default: 300)
+- `MAX_RESTART_ATTEMPTS` - Restarts per service before giving up (default: 3)
+- `EXIT_ON_MAX_RESTARTS` - Exit the container with code 1 once restarts are used up (default: true)
+- `RESTART_FAILURE_THRESHOLD` - Consecutive failed checks before a restart (default: 3)
+- `HEALTHY_CHECKS_BEFORE_RESET` - Consecutive passing checks before a restart counter resets (default: 5)
+- `AUTO_RESTART_CHECK_INTERVAL` - Seconds between watchdog passes (default: 30)
 - `NOTIFICATION_WEBHOOK_URL` - Discord/Slack webhooks
 
 **Privoxy (Optional):**

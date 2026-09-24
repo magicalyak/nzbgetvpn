@@ -35,6 +35,16 @@ LAST_DNS_SERVERS_FILE="/tmp/last_dns_servers"
 STATUS_FILE="/tmp/nzbgetvpn_status.json"
 MAX_LOG_LINES=1000
 
+# Seconds each check took in this run, written to the status file so the
+# monitoring server can export them without METRICS_ENABLED.
+declare -A RESPONSE_TIMES=()
+
+# Shared "does the tunnel carry traffic" probe
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+probe_warn() { log "WARN" "$*"; }
+# shellcheck source=root/vpn-probe.sh
+source "$SCRIPT_DIR/vpn-probe.sh"
+
 # Ensure log directory exists
 mkdir -p "$(dirname "$HEALTHCHECK_LOG")"
 mkdir -p "$(dirname "$METRICS_FILE")"
@@ -61,12 +71,20 @@ log() {
     fi
 }
 
+# Seconds elapsed since a `date +%s.%N` timestamp, always with a leading
+# digit (bc prints ".3", which is not valid JSON).
+elapsed_since() {
+    awk -v s="$1" -v e="$(date +%s.%N)" 'BEGIN { printf "%.3f", e - s }'
+}
+
 # Enhanced metrics collection function
 update_metrics() {
     local check_type="$1"
     local status="$2"
     local response_time="${3:-0}"
     local details="${4:-}"
+    
+    RESPONSE_TIMES["$check_type"]="$response_time"
     
     if [[ "$METRICS_ENABLED" == "true" ]]; then
         local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
@@ -97,8 +115,7 @@ get_external_ip() {
     for service in "${services[@]}"; do
         if ip=$(timeout "$HEALTH_CHECK_TIMEOUT" curl -s --max-time 5 "$service" 2>/dev/null | tr -d '\n\r' | grep -E '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$'); then
             if [[ "$ip" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-                local end_time=$(date +%s.%N)
-                local response_time=$(echo "$end_time - $start_time" | bc 2>/dev/null || echo "0")
+                local response_time=$(elapsed_since "$start_time")
                 update_metrics "external_ip" "success" "$response_time" "$ip"
                 echo "$ip"
                 return 0
@@ -106,8 +123,7 @@ get_external_ip() {
         fi
     done
     
-    local end_time=$(date +%s.%N)
-    local response_time=$(echo "$end_time - $start_time" | bc 2>/dev/null || echo "0")
+    local response_time=$(elapsed_since "$start_time")
     update_metrics "external_ip" "failed" "$response_time" ""
     return 1
 }
@@ -119,14 +135,12 @@ check_dns() {
     log "DEBUG" "Checking DNS resolution for $HEALTH_CHECK_HOST..."
     
     if timeout "$HEALTH_CHECK_TIMEOUT" nslookup "$HEALTH_CHECK_HOST" >/dev/null 2>&1; then
-        local end_time=$(date +%s.%N)
-        local response_time=$(echo "$end_time - $start_time" | bc 2>/dev/null || echo "0")
+        local response_time=$(elapsed_since "$start_time")
         update_metrics "dns" "success" "$response_time" "$HEALTH_CHECK_HOST"
         log "INFO" "DNS resolution successful for $HEALTH_CHECK_HOST (${response_time}s)"
         return 0
     else
-        local end_time=$(date +%s.%N)
-        local response_time=$(echo "$end_time - $start_time" | bc 2>/dev/null || echo "0")
+        local response_time=$(elapsed_since "$start_time")
         update_metrics "dns" "failed" "$response_time" "$HEALTH_CHECK_HOST"
         log "ERROR" "DNS resolution failed for $HEALTH_CHECK_HOST (${response_time}s)"
         return 1
@@ -140,8 +154,7 @@ check_nzbget() {
     log "DEBUG" "Checking NZBGet web interface..."
     
     if timeout "$HEALTH_CHECK_TIMEOUT" curl -sSf --max-time 5 http://localhost:6789 >/dev/null 2>&1; then
-        local end_time=$(date +%s.%N)
-        local response_time=$(echo "$end_time - $start_time" | bc 2>/dev/null || echo "0")
+        local response_time=$(elapsed_since "$start_time")
         update_metrics "nzbget" "success" "$response_time" "http://localhost:6789"
         log "INFO" "NZBGet health check passed (${response_time}s)"
         
@@ -152,8 +165,7 @@ check_nzbget() {
         
         return 0
     else
-        local end_time=$(date +%s.%N)
-        local response_time=$(echo "$end_time - $start_time" | bc 2>/dev/null || echo "0")
+        local response_time=$(elapsed_since "$start_time")
         update_metrics "nzbget" "failed" "$response_time" "http://localhost:6789"
         log "ERROR" "NZBGet health check failed (${response_time}s)"
         return 1
@@ -208,8 +220,7 @@ check_vpn_interface() {
     # Check if interface exists and is up
     if ip link show "$vpn_if" > /dev/null 2>&1; then
         if ip link show "$vpn_if" | grep -q "UP"; then
-            local end_time=$(date +%s.%N)
-            local response_time=$(echo "$end_time - $start_time" | bc 2>/dev/null || echo "0")
+            local response_time=$(elapsed_since "$start_time")
             update_metrics "vpn_interface" "up" "$response_time" "$vpn_if"
             log "INFO" "VPN interface $vpn_if is UP (${response_time}s)"
             
@@ -225,45 +236,43 @@ check_vpn_interface() {
             
             return 0
         else
-            local end_time=$(date +%s.%N)
-            local response_time=$(echo "$end_time - $start_time" | bc 2>/dev/null || echo "0")
+            local response_time=$(elapsed_since "$start_time")
             update_metrics "vpn_interface" "down" "$response_time" "$vpn_if"
             log "ERROR" "VPN interface $vpn_if exists but is DOWN (${response_time}s)"
             return 1
         fi
     else
-        local end_time=$(date +%s.%N)
-        local response_time=$(echo "$end_time - $start_time" | bc 2>/dev/null || echo "0")
+        local response_time=$(elapsed_since "$start_time")
         update_metrics "vpn_interface" "missing" "$response_time" "$vpn_if"
         log "ERROR" "VPN interface $vpn_if does not exist (${response_time}s)"
         return 1
     fi
 }
 
-# Function to check VPN connectivity
+# Function to check VPN connectivity: does traffic actually pass through the
+# tunnel? Returns 0 on success, 1 on failure, 2 when the check is disabled.
 check_vpn_connectivity() {
     local vpn_if="$1"
     local start_time=$(date +%s.%N)
     
     if [[ "$CHECK_VPN_CONNECTIVITY" != "true" ]]; then
         log "DEBUG" "VPN connectivity check disabled"
-        return 0
+        return 2
     fi
     
-    log "DEBUG" "Testing VPN connectivity to $HEALTH_CHECK_HOST through $vpn_if"
+    override_lan_probe_target
+    log "DEBUG" "Testing VPN connectivity to $VPN_PROBE_HOST (fallback ${VPN_PROBE_HOST_FALLBACK:-none}) through $vpn_if"
     
-    # Ping test through VPN interface
-    if timeout "$HEALTH_CHECK_TIMEOUT" ping -c 1 -W 3 -I "$vpn_if" "$HEALTH_CHECK_HOST" > /dev/null 2>&1; then
-        local end_time=$(date +%s.%N)
-        local response_time=$(echo "$end_time - $start_time" | bc 2>/dev/null || echo "0")
-        update_metrics "vpn_connectivity" "success" "$response_time" "$HEALTH_CHECK_HOST"
-        log "INFO" "VPN connectivity test successful (${response_time}s)"
+    local answered
+    if answered=$(vpn_probe_tunnel "$vpn_if"); then
+        local response_time=$(elapsed_since "$start_time")
+        update_metrics "vpn_connectivity" "success" "$response_time" "$answered"
+        log "INFO" "VPN connectivity test successful via $answered (${response_time}s)"
         return 0
     else
-        local end_time=$(date +%s.%N)
-        local response_time=$(echo "$end_time - $start_time" | bc 2>/dev/null || echo "0")
-        update_metrics "vpn_connectivity" "failed" "$response_time" "$HEALTH_CHECK_HOST"
-        log "ERROR" "VPN connectivity test failed to $HEALTH_CHECK_HOST (${response_time}s)"
+        local response_time=$(elapsed_since "$start_time")
+        update_metrics "vpn_connectivity" "failed" "$response_time" "$VPN_PROBE_HOST"
+        log "ERROR" "VPN connectivity test failed through $vpn_if to $VPN_PROBE_HOST and ${VPN_PROBE_HOST_FALLBACK:-no fallback} (${response_time}s)"
         return 1
     fi
 }
@@ -342,11 +351,12 @@ check_dns_leak() {
     fi
 }
 
-# Function to check news server connectivity
+# Function to check news server connectivity. Returns 2 when disabled or when
+# no server is configured, so "not checked" is not reported as "success".
 check_news_server() {
     if [[ "$CHECK_NEWS_SERVER" != "true" ]]; then
         log "DEBUG" "News server check disabled"
-        return 0
+        return 2
     fi
     
     # Read from NZBGet config file instead of environment variables
@@ -356,7 +366,7 @@ check_news_server() {
     
     if [[ -z "$news_host" ]]; then
         log "DEBUG" "No news server configured for health check"
-        return 0
+        return 2
     fi
     
     local start_time=$(date +%s.%N)
@@ -364,14 +374,12 @@ check_news_server() {
     log "DEBUG" "Checking news server connectivity: $news_host:$news_port"
     
     if timeout "$HEALTH_CHECK_TIMEOUT" bash -c "</dev/tcp/$news_host/$news_port" 2>/dev/null; then
-        local end_time=$(date +%s.%N)
-        local response_time=$(echo "$end_time - $start_time" | bc 2>/dev/null || echo "0")
+        local response_time=$(elapsed_since "$start_time")
         update_metrics "news_server" "success" "$response_time" "$news_host:$news_port"
         log "INFO" "News server connectivity check passed: $news_host:$news_port (${response_time}s)"
         return 0
     else
-        local end_time=$(date +%s.%N)
-        local response_time=$(echo "$end_time - $start_time" | bc 2>/dev/null || echo "0")
+        local response_time=$(elapsed_since "$start_time")
         update_metrics "news_server" "failed" "$response_time" "$news_host:$news_port"
         log "WARNING" "News server connectivity check failed: $news_host:$news_port (${response_time}s)"
         return 1
@@ -454,8 +462,12 @@ main() {
             status_checks+=("vpn_interface:up")
             
             # Check 3: VPN connectivity (if interface is up)
-            if check_vpn_connectivity "$vpn_interface"; then
+            local vpn_rc=0
+            check_vpn_connectivity "$vpn_interface" || vpn_rc=$?
+            if [[ $vpn_rc -eq 0 ]]; then
                 status_checks+=("vpn_connectivity:success")
+            elif [[ $vpn_rc -eq 2 ]]; then
+                status_checks+=("vpn_connectivity:skipped")
             else
                 if [[ "$overall_status" == "healthy" ]]; then
                     overall_status="degraded"
@@ -467,13 +479,16 @@ main() {
             overall_status="unhealthy"
             [[ $exit_code -eq 0 ]] && exit_code=2
             status_checks+=("vpn_interface:down")
+            # No usable interface means no traffic through the tunnel
+            status_checks+=("vpn_connectivity:failed")
         fi
     else
         overall_status="unhealthy"
         [[ $exit_code -eq 0 ]] && exit_code=3
         status_checks+=("vpn_interface:missing")
+        status_checks+=("vpn_connectivity:failed")
     fi
-    
+
     # Check 4: DNS resolution
     if check_dns; then
         status_checks+=("dns:success")
@@ -486,8 +501,12 @@ main() {
     fi
     
     # Check 5: News server connectivity (optional, non-critical)
-    if check_news_server; then
+    local news_rc=0
+    check_news_server || news_rc=$?
+    if [[ $news_rc -eq 0 ]]; then
         status_checks+=("news_server:success")
+    elif [[ $news_rc -eq 2 ]]; then
+        status_checks+=("news_server:skipped")
     else
         if [[ "$overall_status" == "healthy" ]]; then
             overall_status="warning"
@@ -495,7 +514,7 @@ main() {
         [[ $exit_code -eq 0 ]] && exit_code=6
         status_checks+=("news_server:failed")
     fi
-    
+
     # Check 6: IP leak detection (optional, non-critical)
     if check_ip_leak; then
         status_checks+=("ip_leak:stable")
@@ -523,11 +542,21 @@ main() {
     
     log "INFO" "Health check completed: $overall_status (exit code: $exit_code)"
     
-    # Create comprehensive status file for external monitoring
-    local external_ip
-    external_ip=$(get_external_ip 2>/dev/null || echo 'unknown')
-    
-    cat > "$STATUS_FILE" << EOF
+    # Create comprehensive status file for external monitoring. Skip the
+    # external IP lookup when the tunnel is known dead: it would only burn
+    # up to 20 seconds of timeouts.
+    local external_ip='unknown'
+    if [[ " ${status_checks[*]} " != *" vpn_connectivity:failed "* ]]; then
+        external_ip=$(get_external_ip 2>/dev/null || echo 'unknown')
+    fi
+
+    local response_times_json="" check_name
+    for check_name in "${!RESPONSE_TIMES[@]}"; do
+        response_times_json+="${response_times_json:+, }\"$check_name\": ${RESPONSE_TIMES[$check_name]}"
+    done
+
+    # Write to a temp file and rename, so readers never see a partial file
+    cat > "${STATUS_FILE}.tmp.$$" << EOF
 {
     "timestamp": "$(date -Iseconds)",
     "status": "$overall_status",
@@ -552,9 +581,11 @@ main() {
         "news_server": "$(echo "${status_checks[@]}" | grep -o 'news_server:[^[:space:]]*' | cut -d: -f2 || echo 'unknown')",
         "ip_leak": "$(echo "${status_checks[@]}" | grep -o 'ip_leak:[^[:space:]]*' | cut -d: -f2 || echo 'unknown')",
         "dns_leak": "$(echo "${status_checks[@]}" | grep -o 'dns_leak:[^[:space:]]*' | cut -d: -f2 || echo 'unknown')"
-    }
+    },
+    "response_times": {${response_times_json}}
 }
 EOF
+    mv -f "${STATUS_FILE}.tmp.$$" "$STATUS_FILE"
     
     exit $exit_code
 }

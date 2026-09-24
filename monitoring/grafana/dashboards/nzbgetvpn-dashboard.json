@@ -635,7 +635,7 @@
           "datasource": "Prometheus",
           "expr": "nzbgetvpn_response_time_seconds",
           "interval": "",
-          "legendFormat": "{{check}} - {{stat}}",
+          "legendFormat": "{{check}}",
           "refId": "A"
         }
       ],
