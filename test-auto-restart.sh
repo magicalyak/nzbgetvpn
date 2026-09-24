@@ -34,6 +34,10 @@ setup() {
     export HEALTHY_CHECKS_BEFORE_RESET=5
     export EXIT_ON_MAX_RESTARTS=true
     export NOTIFICATION_WEBHOOK_URL=
+    export VPN_SETUP_FLAG="$T/vpn_setup_complete"
+    export AUTO_RESTART_STARTUP_GRACE=0
+    export AUTO_RESTART_SETUP_TIMEOUT=600
+    touch "$VPN_SETUP_FLAG"
 
     printf '#!/bin/sh\necho halted >> %s/halt.calls\n' "$T" > "$S6_HALT"
     printf '#!/bin/sh\nexit 0\n' > "$VPN_SETUP_SCRIPT"
@@ -166,6 +170,43 @@ tunnel dead
 expect "watchdog keeps running" "$?" 0
 expect "halt not invoked" "$([[ -f $T/halt.calls ]] && echo yes || echo no)" no
 expect "gave-up message logged once" "$(grep -c 'no further VPN restarts' "$RESTART_LOG")" 1
+teardown
+
+echo
+echo "Failures during the startup grace period are not counted"
+setup
+AUTO_RESTART_STARTUP_GRACE=120
+tunnel gone; pass; pass; pass; pass
+expect "no failures counted" "$vpn_fail_streak" 0
+expect "no restart" "$(vpn_restarts)" 0
+expect "no failure logged" "$(grep -c 'failure detected' "$RESTART_LOG")" 0
+expect "waiting message logged once" "$(grep -c 'Waiting for VPN setup' "$RESTART_LOG")" 1
+AUTO_RESTART_STARTUP_GRACE=0
+pass
+expect "counted once the grace period is over" "$vpn_fail_streak" 1
+teardown
+
+echo
+echo "Failures are not counted before VPN setup completes"
+setup
+rm -f "$VPN_SETUP_FLAG"
+tunnel gone; pass; pass; pass
+expect "no failures counted" "$vpn_fail_streak" 0
+touch "$VPN_SETUP_FLAG"
+pass
+expect "counted once setup is done" "$vpn_fail_streak" 1
+teardown
+
+echo
+echo "A setup that never completes does not idle the watchdog forever"
+setup
+rm -f "$VPN_SETUP_FLAG"
+tunnel gone; pass
+expect "not counted before the setup timeout" "$vpn_fail_streak" 0
+watchdog_started_at=$(( $(date +%s) - 601 ))
+pass
+expect "counted after the setup timeout" "$vpn_fail_streak" 1
+expect "timeout logged" "$(grep -c 'has not completed after' "$RESTART_LOG")" 1
 teardown
 
 echo

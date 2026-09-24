@@ -30,6 +30,14 @@ RESTART_FAILURE_THRESHOLD=${RESTART_FAILURE_THRESHOLD:-3}
 HEALTHY_CHECKS_BEFORE_RESET=${HEALTHY_CHECKS_BEFORE_RESET:-5}
 # A status file older than this is refreshed by running the health check here
 HEALTH_STATUS_MAX_AGE=${HEALTH_STATUS_MAX_AGE:-180}
+# Failures are not counted until VPN setup has finished and this many seconds
+# have passed since, so the first checks after boot do not see a tunnel and
+# NZBGet that are still coming up
+AUTO_RESTART_STARTUP_GRACE=${AUTO_RESTART_STARTUP_GRACE:-120}
+VPN_SETUP_FLAG=${VPN_SETUP_FLAG:-/tmp/vpn_setup_complete}
+# Start counting anyway if setup has not finished after this long, so a setup
+# that never completes cannot keep the watchdog idle forever
+AUTO_RESTART_SETUP_TIMEOUT=${AUTO_RESTART_SETUP_TIMEOUT:-600}
 
 # s6-overlay v3: the container exits with the code in this file once halt runs
 S6_EXITCODE_FILE=${S6_EXITCODE_FILE:-/run/s6-linux-init-container-results/exitcode}
@@ -50,6 +58,9 @@ nzbget_fail_streak=0
 nzbget_ok_streak=0
 gave_up_vpn=false
 gave_up_nzbget=false
+watchdog_started_at=$(date +%s)
+startup_done=false
+startup_wait_logged=false
 
 # Logging function
 log() {
@@ -349,10 +360,39 @@ send_notification() {
     fi
 }
 
+# Returns 0 once the startup grace period is over. Setup finishing is taken
+# from the flag file vpn-setup.sh touches at the end, and the grace runs from
+# that file's mtime.
+startup_complete() {
+    [[ "$startup_done" == "true" ]] && return 0
+
+    local now flag_mtime
+    now=$(date +%s)
+    if flag_mtime=$(stat -c %Y "$VPN_SETUP_FLAG" 2>/dev/null); then
+        if (( now - flag_mtime >= AUTO_RESTART_STARTUP_GRACE )); then
+            startup_done=true
+            log "INFO" "Startup grace period over, counting health check failures"
+            return 0
+        fi
+    elif (( now - watchdog_started_at >= AUTO_RESTART_SETUP_TIMEOUT )); then
+        startup_done=true
+        log "WARNING" "VPN setup has not completed after ${AUTO_RESTART_SETUP_TIMEOUT}s ($VPN_SETUP_FLAG missing), counting health check failures anyway"
+        return 0
+    fi
+
+    if [[ "$startup_wait_logged" != "true" ]]; then
+        startup_wait_logged=true
+        log "INFO" "Waiting for VPN setup plus a ${AUTO_RESTART_STARTUP_GRACE}s grace period before counting failures"
+    fi
+    return 1
+}
+
 # One pass of the monitor. Only a status the health check has written since
 # the previous pass counts toward a streak, so re-reading the same file does
 # not look like sustained health or sustained failure.
 monitor_once() {
+    startup_complete || return 0
+
     refresh_status_if_stale
 
     local status_timestamp
@@ -430,7 +470,7 @@ monitor_and_restart() {
         return 0
     fi
 
-    log "INFO" "Max restart attempts: $MAX_RESTART_ATTEMPTS, cooldown: ${RESTART_COOLDOWN_SECONDS}s, failure threshold: $RESTART_FAILURE_THRESHOLD, exit on max restarts: $EXIT_ON_MAX_RESTARTS"
+    log "INFO" "Max restart attempts: $MAX_RESTART_ATTEMPTS, cooldown: ${RESTART_COOLDOWN_SECONDS}s, failure threshold: $RESTART_FAILURE_THRESHOLD, startup grace: ${AUTO_RESTART_STARTUP_GRACE}s, exit on max restarts: $EXIT_ON_MAX_RESTARTS"
 
     while true; do
         monitor_once

@@ -1,5 +1,18 @@
 # nzbgetvpn Release Notes
 
+## v26.2.3 (2026-09-24)
+**Fix: fallback VPN servers can connect, no false failures at startup, and one health probe instead of two**
+
+- The kill switch now allows every `remote` in the OpenVPN config. Before, only the first one was allowed, so the fallback servers could never connect.
+- The auto-restart watchdog waits for VPN setup plus a 120 second grace period (`AUTO_RESTART_STARTUP_GRACE`) before counting failures.
+- The Docker `HEALTHCHECK` reports the monitoring server's cached result and only runs the full check when that result is stale.
+- Removed the VPN monitor and kill switch helper scripts that were never installed in the image, along with their docs.
+- Fast tests now run in CI on pull requests and before each release.
+
+See CHANGELOG.md for the full list.
+
+---
+
 ## v26.2.2 (2026-09-24)
 **Fix: the restart watchdog now works, and VPN health is exported to Prometheus**
 

@@ -2,10 +2,20 @@
 
 All notable changes to nzbgetvpn will be documented in this file.
 
-## [Unreleased]
+## [v26.2.3] - 2026-09-24
 
 ### Fixed
 - **Kill switch only allowed the first OpenVPN remote**: `vpn-setup.sh` added an OUTPUT exception for the first `remote` line and ignored the rest, so OpenVPN's fallback remotes (and any remote picked by `remote-random`) were dropped by the kill switch and could never connect. When the first server went away the tunnel stayed down. Every `remote` line now gets an exception, a hostname gets one for each IPv4 address it resolves to, and a missing port or protocol falls back to the config's global `port` and `proto` directives before OpenVPN's defaults (1194/udp). Protocols such as `tcp-client` and `udp4` map to `tcp` and `udp`.
+- **Watchdog counted failures during startup**: the first auto-restart pass after boot ran before the tunnel and NZBGet were up and logged "VPN failure detected" and "NZBGet failure detected". The watchdog now waits for `/tmp/vpn_setup_complete` plus `AUTO_RESTART_STARTUP_GRACE` seconds (default 120) before counting anything. If setup never completes it starts counting after `AUTO_RESTART_SETUP_TIMEOUT` seconds (default 600) rather than idling forever.
+- **Health checks ran twice under Docker**: the Dockerfile `HEALTHCHECK` ran the full `healthcheck.sh` every 30 seconds on top of the monitoring server's own runs. It now calls `/root/healthcheck-cached.sh`, which reports the cached result from `/tmp/nzbgetvpn_status.json` and only runs the full check when that result is missing, unreadable or older than `HEALTHCHECK_CACHE_MAX_AGE` seconds (default 90).
+
+### Removed
+- `root/vpn-monitor.sh`, `root/etc/services.d/vpn-monitor` and `root/vpn-killswitch.sh`. None of them were copied into the image, so they never ran. Removing them does not change the kill switch applied by `vpn-setup.sh`, and the auto-restart watchdog covers what the monitor was meant to do. `VPN_CHECK_INTERVAL` and `VPN_MAX_FAILURES` had no effect and are no longer documented.
+- `docs/VPN_KILLSWITCH_SECURITY.md` and `docs/KILLSWITCH_VERIFICATION.md`, which described that monitor. The README now has a short, accurate description of the kill switch, and `test-killswitch.sh` no longer checks for the monitor service.
+
+### CI
+- New `Test` workflow on pull requests and pushes to `main`: runs `test-metrics-render.py`, then builds the image and runs `test-auto-restart.sh` and `test-healthcheck-cached.sh` inside it. The release workflow runs it before building and publishing.
+- `test-dead-tunnel.sh` stays manual (about 10 minutes, needs `NET_ADMIN`). How to run it is in the README.
 
 ## [v26.2.2] - 2026-09-24
 
