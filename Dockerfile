@@ -124,6 +124,7 @@ COPY root/etc/cont-init.d/01-ensure-vpn-config-dirs.sh /etc/cont-init.d/01-ensur
 COPY root/etc/cont-init.d/02-vpn-provider-setup.sh /etc/cont-init.d/02-vpn-provider-setup
 COPY root/etc/cont-init.d/99-nzbget-news-server-override.sh /etc/cont-init.d/99-nzbget-news-server-override
 COPY root/vpn-setup.sh /etc/cont-init.d/50-vpn-setup
+COPY root/vpn-remotes.sh /usr/local/bin/vpn-remotes.sh
 
 # Copy enhanced healthcheck and monitoring scripts
 COPY root/healthcheck.sh /root/healthcheck.sh
@@ -150,11 +151,19 @@ RUN mkdir -p /etc/s6-overlay/s6-rc.d/user/contents.d && \
     echo "longrun" > /etc/s6-overlay/s6-rc.d/privoxy/type && \
     echo "longrun" > /etc/s6-overlay/s6-rc.d/monitoring/type && \
     echo "longrun" > /etc/s6-overlay/s6-rc.d/auto-restart/type && \
-
     touch /etc/s6-overlay/s6-rc.d/user/contents.d/privoxy && \
     touch /etc/s6-overlay/s6-rc.d/user/contents.d/monitoring && \
     touch /etc/s6-overlay/s6-rc.d/user/contents.d/auto-restart && \
-    touch /etc/s6-overlay/s6-rc.d/user/contents.d/openvpn
+    touch /etc/s6-overlay/s6-rc.d/user/contents.d/openvpn && \
+    # s6-overlay starts the user bundle in parallel with the cont-init scripts, so
+    # NZBGet, Privoxy, monitoring and the watchdog used to run on the container's
+    # empty, all-ACCEPT firewall until vpn-setup (cont-init 50) locked it down.
+    # Make them wait for cont-init to finish. init-services covers svc-nzbget and
+    # svc-cron; svc-nzbget is listed as well so it does not rely on that.
+    for svc in init-services svc-nzbget privoxy monitoring auto-restart openvpn; do \
+        mkdir -p "/etc/s6-overlay/s6-rc.d/$svc/dependencies.d" && \
+        touch "/etc/s6-overlay/s6-rc.d/$svc/dependencies.d/legacy-cont-init" || exit 1; \
+    done
 
 # Make scripts executable
 RUN chmod +x /etc/cont-init.d/* /root/healthcheck.sh /root/healthcheck-cached.sh /root/monitoring-server.py /root/auto-restart.sh \

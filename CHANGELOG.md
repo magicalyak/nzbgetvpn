@@ -2,6 +2,21 @@
 
 All notable changes to nzbgetvpn will be documented in this file.
 
+## [v26.2.4] - 2026-09-24
+
+### Fixed
+- **Watchdog VPN restarts could never succeed**: `restart_vpn` reruns `vpn-setup.sh`, where `ip route add $LAN_NETWORK` failed with "File exists" because the route was still there from boot. The script stopped (`set -e`) after setting the policies to DROP but before allowing the tunnel and the VPN servers, so OpenVPN could not reconnect and every tunnel failure lasted until `EXIT_ON_MAX_RESTARTS` replaced the container. The route is now set with `ip route replace`.
+- **Kill switch opened while it was rebuilt**: `vpn-setup.sh` reset every policy to ACCEPT before flushing, so on each watchdog rerun NZBGet could reach the internet outside the tunnel until the policies went back to DROP, and a setup that failed in between (for example, missing credentials) left the container open. The policies now stay DROP throughout. While the kill switch is built, only loopback, the VPN servers and, when a server is a hostname, DNS to the nameservers in `/etc/resolv.conf` are allowed out. These rules are tagged and removed once the kill switch is in place. IPv6 is locked down at the same point.
+- **Hostname VPN servers had no kill switch exception**: remotes and WireGuard endpoints were resolved after DNS on `eth0` was dropped and before the tunnel existed, so the lookup failed and no exception was added. They now resolve while the bootstrap DNS rule is open. OpenVPN starts after `vpn-setup.sh` has finished, so hostname remotes are pinned to the resolved addresses in `/tmp/config.ovpn`, and `remote-random-hostname` is removed.
+- **Services started before the kill switch existed**: s6-overlay starts the user bundle in parallel with the cont-init scripts, so NZBGet, Privoxy, monitoring, the watchdog and the OpenVPN service could run on the container's open firewall until `vpn-setup.sh` locked it down. They now depend on `legacy-cont-init`.
+- **Established connections could leave `eth0` after the tunnel dropped**: `-A OUTPUT -m state --state RELATED,ESTABLISHED -j ACCEPT` matched any interface, so a connection opened through the tunnel could continue over the default route once the tunnel's routes were gone. Established traffic is now accepted on any interface except `eth0`, and on `eth0` only in the reply direction (`--ctdir REPLY`), for IPv4 and IPv6.
+- **OpenVPN restarted mid-setup on a watchdog restart**: s6 respawns OpenVPN as soon as the watchdog kills it, and `/tmp/vpn_setup_complete` was still there from boot, so the client started before the kill switch was rebuilt. The watchdog and `vpn-setup.sh` now remove the flag first. The watchdog then gives the tunnel up to `VPN_RESTART_VERIFY_TIMEOUT` seconds (default 60) to pass traffic, instead of checking once after 10 seconds.
+- **WireGuard setup stopped on BusyBox grep**: the interface address check used `grep -oP`, which BusyBox does not support. The failed grep ended the script under `set -e`.
+
+### CI
+- `test-vpn-setup-bootstrap.sh` runs the real `vpn-setup.sh` and the OpenVPN s6 run script end to end with stubbed `iptables`, `ip`, `openvpn`, `wg-quick` and `nslookup`. After every OUTPUT change it checks that internet traffic cannot leave `eth0`. It covers boot, an in-place rerun with the LAN route already present, hostname remotes, WireGuard and a failed setup.
+- `test-s6-dependencies.sh` compiles the s6-rc database and checks that the services start after cont-init.
+
 ## [v26.2.3] - 2026-09-24
 
 ### Fixed

@@ -38,6 +38,8 @@ VPN_SETUP_FLAG=${VPN_SETUP_FLAG:-/tmp/vpn_setup_complete}
 # Start counting anyway if setup has not finished after this long, so a setup
 # that never completes cannot keep the watchdog idle forever
 AUTO_RESTART_SETUP_TIMEOUT=${AUTO_RESTART_SETUP_TIMEOUT:-600}
+# How long a VPN restart has to pass traffic again before it counts as failed
+VPN_RESTART_VERIFY_TIMEOUT=${VPN_RESTART_VERIFY_TIMEOUT:-60}
 
 # s6-overlay v3: the container exits with the code in this file once halt runs
 S6_EXITCODE_FILE=${S6_EXITCODE_FILE:-/run/s6-linux-init-container-results/exitcode}
@@ -235,6 +237,11 @@ restart_vpn() {
     # Try to restart VPN processes
     local restart_success=false
 
+    # The OpenVPN service starts the client as soon as this flag exists, and s6
+    # respawns it the moment it is killed below. Without the flag it waits for
+    # the setup rerun to finish the kill switch.
+    rm -f "$VPN_SETUP_FLAG"
+
     # Kill existing VPN processes
     if pgrep openvpn >/dev/null 2>&1; then
         log "INFO" "Stopping OpenVPN processes"
@@ -266,16 +273,20 @@ restart_vpn() {
     fi
 
     if $restart_success; then
-        # Wait a bit, then probe again rather than trusting an old status file
-        sleep 10
-        run_healthcheck
-        if vpn_ok; then
-            log "INFO" "VPN restart verification successful"
-            return 0
-        else
-            log "WARNING" "VPN restart verification failed - tunnel not passing traffic"
-            return 1
-        fi
+        # OpenVPN only starts once setup has finished, so give it time to connect.
+        # Probe again rather than trusting an old status file.
+        local waited=0
+        while (( waited < VPN_RESTART_VERIFY_TIMEOUT )); do
+            sleep 10
+            waited=$((waited + 10))
+            run_healthcheck
+            if vpn_ok; then
+                log "INFO" "VPN restart verification successful after ${waited}s"
+                return 0
+            fi
+        done
+        log "WARNING" "VPN restart verification failed - tunnel not passing traffic after ${waited}s"
+        return 1
     else
         return 1
     fi

@@ -43,6 +43,45 @@ fi
 echo "$DEFAULT_VPN_INTERFACE" > "$VPN_INTERFACE_FILE"
 echo "[INFO] Default VPN interface set to: $(cat $VPN_INTERFACE_FILE)"
 
+# The OpenVPN service starts the client once this flag exists. Remove it while the
+# firewall is rebuilt, so a client that s6 respawns during an auto-restart rerun
+# waits for the finished kill switch.
+rm -f /tmp/vpn_setup_complete
+
+# VPN server parsing and kill switch exceptions.
+remote_log() { echo "[INFO] $*"; }
+# shellcheck source=root/vpn-remotes.sh
+. "${VPN_REMOTES_LIB:-/usr/local/bin/vpn-remotes.sh}"
+
+# Rules that only exist while the kill switch is built carry this comment, so they
+# can be removed afterwards without flushing the chains again.
+BOOTSTRAP_TAG="vpn-bootstrap"
+
+# Let the VPN servers be resolved while nothing else can use DNS: only to the
+# nameservers in the current resolv.conf, and only if a server is a hostname.
+bootstrap_allow_dns() {
+  local ns
+  while read -r ns; do
+    vpn_is_ipv4 "$ns" || continue
+    echo "[INFO] Allowing DNS to $ns on eth0 while the kill switch is built (VPN server is a hostname)."
+    iptables -A OUTPUT -o eth0 -d "$ns" -p udp --dport 53 -m comment --comment "$BOOTSTRAP_TAG" -j ACCEPT
+    iptables -A OUTPUT -o eth0 -d "$ns" -p tcp --dport 53 -m comment --comment "$BOOTSTRAP_TAG" -j ACCEPT
+  done < <(awk '$1 == "nameserver" { print $2 }' /etc/resolv.conf 2>/dev/null)
+}
+
+# Remove every bootstrap rule. Deleting the -S spec with -A turned into -D keeps
+# this exact, whatever the rule matched.
+bootstrap_clear() {
+  local chain rule
+  for chain in INPUT OUTPUT; do
+    while read -r rule; do
+      [ -n "$rule" ] || continue
+      eval "iptables ${rule/-A /-D }" || true
+    done < <(iptables -S "$chain" 2>/dev/null | grep -F -- "--comment $BOOTSTRAP_TAG" || true)
+  done
+  echo "[INFO] Removed kill switch bootstrap rules."
+}
+
 
 # Function to find OpenVPN credentials
 find_vpn_credentials() {
@@ -301,6 +340,13 @@ EOF
     echo "[INFO] Removed redirect-gateway def1 from OpenVPN config due to LAN_NETWORK being set."
   fi
 
+  # The firewall is locked down (see the flush below); open it for the VPN servers
+  # only. Hostnames are resolved now, while DNS is allowed, and pinned in the config.
+  if vpn_remotes_need_dns "$TEMP_OVPN_CONFIG"; then
+    bootstrap_allow_dns
+    vpn_pin_remotes "$TEMP_OVPN_CONFIG"
+  fi
+  vpn_allow_remotes "$TEMP_OVPN_CONFIG" append -m comment --comment "$BOOTSTRAP_TAG"
 
   echo "[INFO] OpenVPN configuration prepared. Service will be started by s6-overlay."
   echo "[INFO] Configuration file: $TEMP_OVPN_CONFIG"
@@ -339,6 +385,12 @@ start_wireguard() {
   echo "[INFO] WireGuard config contents (sanitized):"
   grep -v "PrivateKey" "$WG_CONFIG" | head -20
 
+  # The firewall is locked down (see the flush below); open it for the peers only.
+  if vpn_wg_endpoints_need_dns "$WG_CONFIG"; then
+    bootstrap_allow_dns
+  fi
+  vpn_allow_wg_endpoints "$WG_CONFIG" append -m comment --comment "$BOOTSTRAP_TAG"
+
   echo "[INFO] Starting WireGuard for interface $INTERFACE_NAME using $WG_CONFIG..."
 
   # Run wg-quick with verbose output
@@ -359,7 +411,8 @@ start_wireguard() {
     ip link show "$INTERFACE_NAME"
 
     # Check if interface has an IP
-    WG_IP=$(ip -4 addr show "$INTERFACE_NAME" 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
+    # BusyBox grep has no -P, and a failing grep here stopped the script (set -e).
+    WG_IP=$(ip -4 addr show "$INTERFACE_NAME" 2>/dev/null | awk '$1 == "inet" { sub(/\/.*/, "", $2); print $2; exit }')
     if [ -n "$WG_IP" ]; then
       echo "[INFO] WireGuard interface has IP: $WG_IP"
     else
@@ -392,25 +445,42 @@ start_wireguard() {
   fi
 }
 
-# Reset and flush iptables BEFORE bringing the VPN tunnel up.
-# Two reasons:
-#  1. On in-place restart, leftover strict-DROP policies from a previous run
-#     would block the wg-quick / OpenVPN initial handshake. Reset to ACCEPT
-#     first so the tunnel can come up.
-#  2. wg-quick / OpenVPN configs commonly include PostUp / up hooks that
-#     install iptables rules (typical with provider-supplied configs).
-#     Flushing AFTER `wg-quick up` would wipe those rules, so flush BEFORE.
-# Strict-DROP killswitch policies are re-applied below once the tunnel is up
-# and our explicit ACCEPT rules are in place.
-iptables -P INPUT  ACCEPT
-iptables -P OUTPUT ACCEPT
-iptables -P FORWARD ACCEPT
+# Flush iptables BEFORE bringing the VPN tunnel up, and keep it locked down.
+#  - wg-quick / OpenVPN configs commonly include PostUp / up hooks that install
+#    iptables rules (typical with provider-supplied configs). Flushing AFTER the
+#    tunnel is up would wipe those rules, so flush BEFORE.
+#  - The policies stay DROP. This used to reset them to ACCEPT so the handshake
+#    could get out, which opened everything until the policies went back to DROP:
+#    on every auto-restart rerun, where NZBGet keeps running, and for good if this
+#    script failed in between. Now only loopback and the VPN servers are allowed
+#    out (added by start_openvpn / start_wireguard), plus DNS to the configured
+#    nameservers when a server is a hostname, and replies on connections that
+#    already exist. Those rules are tagged and removed once the kill switch is built.
+iptables -P INPUT  DROP
+iptables -P OUTPUT DROP
+iptables -P FORWARD DROP
 iptables -F INPUT
 iptables -F FORWARD
 iptables -F OUTPUT
 iptables -t nat -F
 iptables -t mangle -F
-echo "[INFO] Reset policies to ACCEPT and flushed iptables before tunnel start."
+# IPv6 is never allowed out except on loopback. Without this, IPv6 traffic egresses
+# on eth0 outside the tunnel if the host pushes an IPv6 default route. Soft-fail on
+# hosts where the kernel ip6tables module is absent (e.g. CONFIG_IP6_NF_IPTABLES=n).
+ip6tables -P INPUT DROP   2>/dev/null || true
+ip6tables -P FORWARD DROP 2>/dev/null || true
+ip6tables -P OUTPUT DROP  2>/dev/null || true
+ip6tables -F INPUT        2>/dev/null || true
+ip6tables -F FORWARD      2>/dev/null || true
+ip6tables -F OUTPUT       2>/dev/null || true
+ip6tables -A INPUT  -i lo -j ACCEPT 2>/dev/null || true
+ip6tables -A OUTPUT -o lo -j ACCEPT 2>/dev/null || true
+iptables -A INPUT  -i lo -m comment --comment "$BOOTSTRAP_TAG" -j ACCEPT
+iptables -A OUTPUT -o lo -m comment --comment "$BOOTSTRAP_TAG" -j ACCEPT
+iptables -A INPUT  -m conntrack --ctstate RELATED,ESTABLISHED -m comment --comment "$BOOTSTRAP_TAG" -j ACCEPT
+# Replies only (web UI, monitoring, LAN clients); nothing the container starts itself.
+iptables -A OUTPUT -o eth0 -m conntrack --ctstate RELATED,ESTABLISHED --ctdir REPLY -m comment --comment "$BOOTSTRAP_TAG" -j ACCEPT
+echo "[INFO] Flushed iptables; only the VPN servers are allowed out until the kill switch is built."
 
 # Select VPN client
 if [ "${VPN_CLIENT,,}" = "openvpn" ]; then
@@ -452,38 +522,23 @@ else
     echo "[INFO] Detected eth0 IP: $ETH0_IP"
 fi
 
-# Set default policies - STRICT DENY-ALL APPROACH
-# NB: iptables is no longer flushed here. The flush happens before the
-# tunnel is brought up so PostUp hooks survive (see earlier in this script).
-iptables -P INPUT DROP
-iptables -P FORWARD DROP
-iptables -P OUTPUT DROP # DROP by default for strict killswitch
-echo "[INFO] Set strict default iptables policies (ALL chains set to DROP)."
-
-# IPv6 killswitch. Without this, IPv6 traffic egresses on eth0 outside the
-# tunnel if the host pushes an IPv6 default route, which is a real leak in
-# any IPv6-capable environment. Soft-fail with || true on hosts where the
-# kernel ip6tables module is absent (e.g. CONFIG_IP6_NF_IPTABLES=n).
-ip6tables -P INPUT DROP   2>/dev/null || true
-ip6tables -P FORWARD DROP 2>/dev/null || true
-ip6tables -P OUTPUT DROP  2>/dev/null || true
-ip6tables -F INPUT        2>/dev/null || true
-ip6tables -F FORWARD      2>/dev/null || true
-ip6tables -F OUTPUT       2>/dev/null || true
-ip6tables -A INPUT  -i lo -j ACCEPT 2>/dev/null || true
-ip6tables -A OUTPUT -o lo -j ACCEPT 2>/dev/null || true
-ip6tables -A INPUT  -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true
-ip6tables -A OUTPUT -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true
-echo "[INFO] IPv6 killswitch applied (drop all except loopback + established)."
+# The policies have been DROP since the flush above (IPv4 and IPv6).
 
 # Allow loopback traffic
 iptables -A INPUT -i lo -j ACCEPT
 iptables -A OUTPUT -o lo -j ACCEPT
 echo "[INFO] Allowed loopback traffic."
 
-# Allow established and related connections (standard rule)
+# Allow established and related connections. They may leave through the tunnel,
+# but on eth0 only as replies to inbound connections (web UI, monitoring, Privoxy,
+# LAN). A connection opened through the tunnel stays ESTABLISHED after the
+# tunnel's routes are gone, and would otherwise follow the default route out of eth0.
 iptables -A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT
-iptables -A OUTPUT -m state --state RELATED,ESTABLISHED -j ACCEPT
+iptables -A OUTPUT ! -o eth0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+iptables -A OUTPUT -o eth0 -m conntrack --ctstate RELATED,ESTABLISHED --ctdir REPLY -j ACCEPT
+ip6tables -A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true
+ip6tables -A OUTPUT ! -o eth0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true
+ip6tables -A OUTPUT -o eth0 -m conntrack --ctstate RELATED,ESTABLISHED --ctdir REPLY -j ACCEPT 2>/dev/null || true
 # For FORWARD chain as well, if container were to act as a router for others (not typical for this use case but good practice)
 iptables -A FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
 echo "[INFO] Allowed established/related connections."
@@ -546,8 +601,10 @@ echo "[INFO] CONNMARK rules for monitoring server (port 8080) applied."
 # If LAN_NETWORK is set, allow traffic to it without VPN
 if [ -n "$LAN_NETWORK" ]; then
   echo "[INFO] LAN_NETWORK ($LAN_NETWORK) is set. Adding route and iptables exception."
-  # Add route for LAN_NETWORK to go via eth0's gateway
-  ip route add "$LAN_NETWORK" via "$ETH0_GATEWAY" dev eth0
+  # Add route for LAN_NETWORK to go via eth0's gateway. replace, not add: on an
+  # auto-restart rerun the route already exists, and "File exists" stopped this
+  # script (set -e) before the tunnel and VPN server exceptions were allowed.
+  ip route replace "$LAN_NETWORK" via "$ETH0_GATEWAY" dev eth0
   # Allow output to LAN_NETWORK
   iptables -A OUTPUT -o eth0 -d "$LAN_NETWORK" -j ACCEPT
   # Allow input from LAN_NETWORK (e.g. for NZBGet calling back to a local Sonarr/Radarr)
@@ -582,127 +639,16 @@ fi
 # All other OUTPUT traffic must go through VPN interface
 iptables -A OUTPUT -o "$VPN_INTERFACE" -j ACCEPT
 
-# CRITICAL FIX: Allow VPN server connectivity before applying kill switch
-# This prevents the chicken-and-egg problem where the kill switch blocks
-# the UDP traffic needed to establish the VPN connection
+# Allow the VPN servers through the kill switch: every OpenVPN remote (hostnames
+# were pinned to their addresses by start_openvpn) or every WireGuard endpoint.
 if [ "${VPN_CLIENT,,}" = "openvpn" ]; then
-  echo "[INFO] Extracting VPN server details from OpenVPN config for kill switch exception..."
-  TEMP_OVPN_CONFIG="/tmp/config.ovpn"
-  
-  if [ -f "$TEMP_OVPN_CONFIG" ]; then
-    # Allow every remote, not just the first. OpenVPN falls through the list on
-    # connection failure (and shuffles it with remote-random), so a remote
-    # without an exception can never connect and the fallbacks are dead.
-    # A remote line is "remote HOST [PORT] [PROTO]"; missing fields come from
-    # the global port/proto directives, then OpenVPN's defaults (1194, udp).
-    DEFAULT_VPN_PORT=$(awk '$1 == "port" { print $2; exit }' "$TEMP_OVPN_CONFIG" | tr -d '\r')
-    DEFAULT_VPN_PROTO=$(awk '$1 == "proto" { print $2; exit }' "$TEMP_OVPN_CONFIG" | tr -d '\r')
-    [ -z "$DEFAULT_VPN_PORT" ] && DEFAULT_VPN_PORT="1194"
-    [ -z "$DEFAULT_VPN_PROTO" ] && DEFAULT_VPN_PROTO="udp"
-
-    VPN_REMOTE_COUNT=0
-    VPN_EXCEPTION_COUNT=0
-    while read -r _ VPN_SERVER_HOST VPN_SERVER_PORT VPN_SERVER_PROTO _; do
-      [ -z "$VPN_SERVER_HOST" ] && continue
-      VPN_REMOTE_COUNT=$((VPN_REMOTE_COUNT + 1))
-      [ -z "$VPN_SERVER_PORT" ] && VPN_SERVER_PORT="$DEFAULT_VPN_PORT"
-      [ -z "$VPN_SERVER_PROTO" ] && VPN_SERVER_PROTO="$DEFAULT_VPN_PROTO"
-      # OpenVPN accepts udp4, udp6, tcp-client, tcp4 and so on; iptables wants udp or tcp.
-      case "${VPN_SERVER_PROTO,,}" in
-        tcp*) VPN_SERVER_PROTO="tcp" ;;
-        *) VPN_SERVER_PROTO="udp" ;;
-      esac
-
-      echo "[INFO] VPN server: $VPN_SERVER_HOST:$VPN_SERVER_PORT ($VPN_SERVER_PROTO)"
-
-      # Resolve hostname to IPs if needed (DNS should work at this point).
-      # Every IPv4 address is allowed because OpenVPN may use any of them.
-      if echo "$VPN_SERVER_HOST" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
-        VPN_SERVER_IPS="$VPN_SERVER_HOST"
-      else
-        echo "[INFO] Resolving VPN server hostname: $VPN_SERVER_HOST"
-        # Filter out invalid IPv6 addresses like "::" and only get valid IPv4 addresses
-        VPN_SERVER_IPS=$(nslookup "$VPN_SERVER_HOST" 2>/dev/null | awk '/^Address: / { print $2 }' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | sort -u || true)
-        if [ -z "$VPN_SERVER_IPS" ]; then
-          # Fallback to getent hosts, also filtering for IPv4
-          VPN_SERVER_IPS=$(getent ahostsv4 "$VPN_SERVER_HOST" 2>/dev/null | awk '{print $1}' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | sort -u || true)
-        fi
-      fi
-
-      if [ -z "$VPN_SERVER_IPS" ]; then
-        echo "[WARN] Could not resolve VPN server IP for $VPN_SERVER_HOST. OpenVPN will not be able to use this remote."
-        continue
-      fi
-      for VPN_SERVER_IP in $VPN_SERVER_IPS; do
-        # The same address can appear on more than one remote line.
-        if iptables -C OUTPUT -d "$VPN_SERVER_IP" -p "$VPN_SERVER_PROTO" --dport "$VPN_SERVER_PORT" -j ACCEPT 2>/dev/null; then
-          continue
-        fi
-        echo "[INFO] Adding kill switch exception for VPN server: $VPN_SERVER_IP:$VPN_SERVER_PORT ($VPN_SERVER_PROTO)"
-        iptables -A OUTPUT -d "$VPN_SERVER_IP" -p "$VPN_SERVER_PROTO" --dport "$VPN_SERVER_PORT" -j ACCEPT
-        VPN_EXCEPTION_COUNT=$((VPN_EXCEPTION_COUNT + 1))
-      done
-    done < <(grep -E '^[[:space:]]*remote[[:space:]]' "$TEMP_OVPN_CONFIG" | tr -d '\r')
-
-    if [ "$VPN_REMOTE_COUNT" -eq 0 ]; then
-      echo "[WARN] No 'remote' directive found in OpenVPN config. Using fallback exception for common VPN ports."
-      # Fallback: allow common OpenVPN ports
-      iptables -A OUTPUT -p udp --dport 1194 -j ACCEPT
-      iptables -A OUTPUT -p tcp --dport 1194 -j ACCEPT
-    else
-      echo "[INFO] Added $VPN_EXCEPTION_COUNT kill switch exception(s) for $VPN_REMOTE_COUNT OpenVPN remote(s)"
-    fi
-  else
-    echo "[WARN] OpenVPN config file not found at $TEMP_OVPN_CONFIG. Adding fallback VPN port exceptions."
-    # Fallback: allow common OpenVPN ports
-    iptables -A OUTPUT -p udp --dport 1194 -j ACCEPT
-    iptables -A OUTPUT -p tcp --dport 1194 -j ACCEPT
-  fi
-elif [ "${VPN_CLIENT,,}" = "wireguard" ]; then
-  echo "[INFO] WireGuard detected. Extracting endpoint from config for kill switch exception..."
-  WG_CONFIG_FILE="$VPN_CONFIG"
-  if [ -z "$WG_CONFIG_FILE" ]; then
-    WG_CONFIG_FILE=$(find /config/wireguard -maxdepth 1 -name '*.conf' -print -quit)
-  fi
-
-  if [ -f "$WG_CONFIG_FILE" ]; then
-    # Extract Endpoint from WireGuard config (format: Endpoint = hostname:port or ip:port)
-    WG_ENDPOINT=$(grep -E "^Endpoint\s*=" "$WG_CONFIG_FILE" | head -1 | sed 's/.*=\s*//' | xargs)
-    if [ -n "$WG_ENDPOINT" ]; then
-      WG_SERVER_HOST=$(echo "$WG_ENDPOINT" | cut -d':' -f1)
-      WG_SERVER_PORT=$(echo "$WG_ENDPOINT" | cut -d':' -f2)
-      [ -z "$WG_SERVER_PORT" ] && WG_SERVER_PORT="51820"
-
-      echo "[INFO] WireGuard endpoint: $WG_SERVER_HOST:$WG_SERVER_PORT"
-
-      # Resolve hostname to IP if needed
-      if echo "$WG_SERVER_HOST" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
-        WG_SERVER_IP="$WG_SERVER_HOST"
-      else
-        echo "[INFO] Resolving WireGuard server hostname: $WG_SERVER_HOST"
-        WG_SERVER_IP=$(nslookup "$WG_SERVER_HOST" 2>/dev/null | awk '/^Address: / { print $2 }' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
-        if [ -z "$WG_SERVER_IP" ]; then
-          WG_SERVER_IP=$(getent hosts "$WG_SERVER_HOST" 2>/dev/null | awk '{print $1}' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
-        fi
-      fi
-
-      if [ -n "$WG_SERVER_IP" ]; then
-        echo "[INFO] Adding kill switch exception for WireGuard server: $WG_SERVER_IP:$WG_SERVER_PORT (udp)"
-        iptables -A OUTPUT -d "$WG_SERVER_IP" -p udp --dport "$WG_SERVER_PORT" -j ACCEPT
-        echo "[INFO] WireGuard server connectivity exception added successfully"
-      else
-        echo "[WARN] Could not resolve WireGuard server IP for $WG_SERVER_HOST. Adding fallback exception."
-        iptables -A OUTPUT -p udp --dport "$WG_SERVER_PORT" -j ACCEPT
-      fi
-    else
-      echo "[WARN] No Endpoint found in WireGuard config. Adding fallback exception for port 51820."
-      iptables -A OUTPUT -p udp --dport 51820 -j ACCEPT
-    fi
-  else
-    echo "[WARN] WireGuard config file not found. Adding fallback port exception."
-    iptables -A OUTPUT -p udp --dport 51820 -j ACCEPT
-  fi
+  vpn_allow_remotes "$TEMP_OVPN_CONFIG" append
+else
+  vpn_allow_wg_endpoints "$WG_CONFIG" append
 fi
+
+# The permanent rules are all in place; drop the bootstrap ones.
+bootstrap_clear
 
 # STRICT KILLSWITCH - Log and drop any remaining eth0 traffic
 iptables -A OUTPUT -o eth0 -m limit --limit 1/min -j LOG --log-prefix "[KILLSWITCH-BLOCKED] " --log-level 4
