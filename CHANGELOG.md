@@ -2,6 +2,32 @@
 
 All notable changes to nzbgetvpn will be documented in this file.
 
+## [v26.2.2] - 2026-09-24
+
+### Fixed
+- **Auto-restart never ran under s6**: `root_s6/auto-restart/run` and `root_s6/monitoring/run` used `#!/usr/bin/env bash`, and s6-rc starts services with an empty environment, so `ENABLE_AUTO_RESTART=true` never reached the watchdog and it sat in `sleep infinity`. Both now use `with-contenv`.
+- **Nothing ran the health check under Kubernetes**: only the Dockerfile `HEALTHCHECK` called `healthcheck.sh`, and Kubernetes ignores it, so `/tmp/nzbgetvpn_status.json` never existed. Every status-derived metric was missing and the watchdog had nothing to act on. The monitoring server now runs the health check every `HEALTH_CHECK_INTERVAL` seconds (default 30) and caches the result.
+- **Watchdog gave up forever**: after `MAX_RESTART_ATTEMPTS` it logged "Maximum VPN restart attempts exceeded" and stopped trying while the web UI stayed up. It now exits the container with code 1 through s6-overlay (`/run/s6-linux-init-container-results/exitcode` plus `/run/s6/basedir/bin/halt`) so Docker or Kubernetes replaces it. Controlled by the new `EXIT_ON_MAX_RESTARTS` (default `true`).
+- **Watchdog only watched the interface**: a tunnel whose interface kept its address but passed no traffic, or whose interface had disappeared (`missing`), never triggered a restart. It now acts on failed connectivity as well.
+- **Restart counters reset on stale data**: the healthy streak counted re-reads of the same status file. Only a status written since the previous pass counts now, and counters reset per service after `HEALTHY_CHECKS_BEFORE_RESET` consecutive passing checks (default 5).
+- **One dropped probe bounced the tunnel**: a restart now needs `RESTART_FAILURE_THRESHOLD` consecutive failed checks (default 3).
+- **NZBGet restart used a path that does not exist**: `/run/s6/services/nzbget` is now `/run/service/svc-nzbget`, and the fallback that started a second, unsupervised NZBGet as root is gone.
+- **Restart verification read an old status file**: after a restart the watchdog now runs the health check again before deciding.
+- **Connectivity probe conflated DNS with the tunnel**: it pinged `HEALTH_CHECK_HOST` (`google.com`) once. It now uses the transmissionvpn probe: three packets to `VPN_PROBE_HOST` (default `1.1.1.1`), then `VPN_PROBE_HOST_FALLBACK` (default `9.9.9.9`), bound to the VPN interface. `HEALTH_CHECK_HOST` is still used for the DNS check.
+- **Skipped checks reported as passing**: a disabled connectivity check or an unconfigured news server reported `success`. They now report `skipped` and are left out of the metrics.
+
+### Added
+- Prometheus gauges `nzbgetvpn_healthy`, `nzbgetvpn_vpn_connected` (traffic passes through the tunnel) and `nzbgetvpn_vpn_interface_up` (interface up with an address, which does not imply traffic), plus `nzbgetvpn_health_check_timestamp_seconds`. A result older than `HEALTH_STATUS_MAX_AGE` (default 180s) reports unhealthy and disconnected.
+- `nzbgetvpn_response_time_seconds{check}` and `nzbgetvpn_success_rate_percent{check}` are now always emitted. Previously they depended on `METRICS_ENABLED=true` (off by default) and on the status file existing, so they never appeared. Success rate covers the last `SUCCESS_RATE_WINDOW` runs (default 20).
+- `test-metrics-render.py`, `test-auto-restart.sh` and `test-dead-tunnel.sh` (end to end against a real container, simulating a dead tunnel with `iptables -I OUTPUT -o tun0 -j DROP`).
+
+### Changed
+- `/metrics` now returns Prometheus text; the JSON history moved to `/metrics.json` (also `/metrics?format=json`). `/prometheus` still works.
+- `nzbgetvpn_response_time_seconds` is the latest duration per check and no longer carries a `stat` label.
+- `nzbgetvpn_health_check` is kept as a deprecated alias of `nzbgetvpn_healthy`.
+- Scrapes no longer call `ifconfig.me`; the external IP comes from the latest health check.
+- `ENABLE_MONITORING=no` now takes effect (it was also lost without `with-contenv`) and idles the service instead of letting s6 restart it every second.
+
 ## [v26.2.1] - 2026-06-22
 
 ### Added

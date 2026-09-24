@@ -1,11 +1,14 @@
-#!/usr/bin/env bash
+#!/command/with-contenv bash
+# shellcheck shell=bash
 
-# s6-overlay service for nzbgetvpn monitoring server
+# s6-overlay service for nzbgetvpn monitoring server. with-contenv passes the
+# container environment through to the server and to the health checks it runs.
 
 # Only start monitoring server if enabled
 if [[ "${ENABLE_MONITORING:-yes}" != "yes" ]]; then
     echo "Monitoring server disabled via ENABLE_MONITORING environment variable"
-    exit 0
+    # Sleep instead of exiting, or s6 restarts this longrun every second
+    exec sleep infinity
 fi
 
 # Ensure Python is available

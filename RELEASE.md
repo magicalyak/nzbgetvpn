@@ -1,5 +1,18 @@
 # nzbgetvpn Release Notes
 
+## v26.2.2 (2026-09-24)
+**Fix: the restart watchdog now works, and VPN health is exported to Prometheus**
+
+- The auto-restart service never received its environment under s6, and nothing ran the health check under Kubernetes, so the watchdog never acted. Both are fixed.
+- Once `MAX_RESTART_ATTEMPTS` is used up the container exits with code 1 (`EXIT_ON_MAX_RESTARTS=true`) instead of the watchdog giving up.
+- New gauges: `nzbgetvpn_healthy`, `nzbgetvpn_vpn_connected`, `nzbgetvpn_vpn_interface_up`. `nzbgetvpn_vpn_connected` is an end-to-end probe through the tunnel, not an interface check.
+- `nzbgetvpn_response_time_seconds{check}` and `nzbgetvpn_success_rate_percent{check}` are emitted by default.
+- `/metrics` is now Prometheus text on port 8080; `/prometheus` still works.
+
+See CHANGELOG.md for the full list.
+
+---
+
 ## v25.0.29 (2025-01-19) ✅ HEALTH MONITORING FIXED
 **Critical Fix: Health Checks Now Show Meaningful Values**
 

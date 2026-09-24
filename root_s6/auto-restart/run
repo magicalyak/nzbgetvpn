@@ -1,6 +1,9 @@
-#!/usr/bin/env bash
+#!/command/with-contenv bash
+# shellcheck shell=bash
 
-# s6-overlay service for auto-restart monitoring
+# s6-overlay service for auto-restart monitoring. with-contenv is required:
+# s6-rc services start with an empty environment, so without it
+# ENABLE_AUTO_RESTART and the other settings never reach this script.
 
 # Only start auto-restart if enabled
 if [[ "${ENABLE_AUTO_RESTART:-false}" != "true" ]]; then

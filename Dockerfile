@@ -61,6 +61,7 @@ ENV MONITORING_LOG_LEVEL=${MONITORING_LOG_LEVEL:-INFO}
 ENV ENABLE_AUTO_RESTART=${ENABLE_AUTO_RESTART:-false}
 ENV RESTART_COOLDOWN_SECONDS=${RESTART_COOLDOWN_SECONDS:-300}
 ENV MAX_RESTART_ATTEMPTS=${MAX_RESTART_ATTEMPTS:-3}
+ENV EXIT_ON_MAX_RESTARTS=${EXIT_ON_MAX_RESTARTS:-true}
 ENV RESTART_ON_VPN_FAILURE=${RESTART_ON_VPN_FAILURE:-true}
 ENV RESTART_ON_NZBGET_FAILURE=${RESTART_ON_NZBGET_FAILURE:-true}
 ENV DISABLE_IP_LEAK_CHECK=${DISABLE_IP_LEAK_CHECK:-false}
@@ -126,6 +127,7 @@ COPY root/vpn-setup.sh /etc/cont-init.d/50-vpn-setup
 
 # Copy enhanced healthcheck and monitoring scripts
 COPY root/healthcheck.sh /root/healthcheck.sh
+COPY root/vpn-probe.sh /root/vpn-probe.sh
 COPY root/monitoring-server.py /root/monitoring-server.py
 COPY root/auto-restart.sh /root/auto-restart.sh
 
