@@ -2,7 +2,7 @@
 
 All notable changes to nzbgetvpn will be documented in this file.
 
-## [v26.2.4] - 2026-09-24
+## [Unreleased]
 
 ### Fixed
 - **Kill switch only allowed the first OpenVPN remote**: `vpn-setup.sh` added an OUTPUT exception for the first `remote` line and ignored the rest, so OpenVPN's fallback remotes (and any remote picked by `remote-random`) were dropped by the kill switch and could never connect. When the first server went away the tunnel stayed down. Every `remote` line now gets an exception, a hostname gets one for each IPv4 address it resolves to, and a missing port or protocol falls back to the config's global `port` and `proto` directives before OpenVPN's defaults (1194/udp). Protocols such as `tcp-client` and `udp4` map to `tcp` and `udp`.
