@@ -43,3 +43,9 @@ jobs:
 
       - name: Cached healthcheck tests
         run: docker run --rm --entrypoint bash -v "$PWD:/src:ro" nzbgetvpn:test /src/test-healthcheck-cached.sh
+
+      - name: Kill switch bootstrap tests
+        run: docker run --rm --entrypoint bash -v "$PWD:/src:ro" nzbgetvpn:test /src/test-vpn-setup-bootstrap.sh
+
+      - name: s6 service dependency tests
+        run: docker run --rm --entrypoint bash -v "$PWD:/src:ro" nzbgetvpn:test /src/test-s6-dependencies.sh
