@@ -560,6 +560,8 @@ docker exec nzbgetvpn cat /tmp/nzbgetvpn_status.json | jq '.'
 docker exec nzbgetvpn tail -f /config/healthcheck.log
 ```
 
+The Docker `HEALTHCHECK` runs `/root/healthcheck-cached.sh`, which reports the result the monitoring server cached in `/tmp/nzbgetvpn_status.json` and only runs the full check when that result is missing or older than `HEALTHCHECK_CACHE_MAX_AGE` seconds, so the probes are not run twice.
+
 **👉 Complete configuration guide:** [HEALTHCHECK_OPTIONS.md](HEALTHCHECK_OPTIONS.md)
 
 ## 🔧 Enhanced Monitoring & Auto-Restart
@@ -581,6 +583,7 @@ NOTIFICATION_WEBHOOK_URL=https://discord.com/api/webhooks/YOUR_WEBHOOK
 - Restarts the VPN when the tunnel stops passing traffic, not only when the interface disappears
 - Monitors NZBGet health and restarts it through s6 if needed
 - Acts only after `RESTART_FAILURE_THRESHOLD` consecutive failed checks, so one dropped probe does not bounce the tunnel
+- Ignores checks until VPN setup has finished and `AUTO_RESTART_STARTUP_GRACE` seconds (default 120) have passed, so a tunnel and NZBGet that are still starting are not counted as failures
 - Cooldown between restarts to prevent restart loops
 - Discord/Slack notifications for service events
 
@@ -636,9 +639,6 @@ docker run -d \
 - `VPN_OPTIONS` - Additional VPN client options
 - `NAME_SERVERS` - Custom DNS servers
 
-**VPN Kill Switch & Security:**
-- `VPN_CHECK_INTERVAL`, `VPN_MAX_FAILURES`, `CHECK_DNS`, `CHECK_EXTERNAL_IP`, `AUTO_RESTART_VPN` - Read only by `root/vpn-monitor.sh`, which the image does not currently install, so they have no effect. Use the auto-restart settings below instead.
-
 **System Settings:**
 - `PUID` / `PGID` - User/Group IDs
 - `TZ` - Timezone
@@ -669,6 +669,9 @@ docker run -d \
 - `RESTART_FAILURE_THRESHOLD` - Consecutive failed checks before a restart (default: 3)
 - `HEALTHY_CHECKS_BEFORE_RESET` - Consecutive passing checks before a restart counter resets (default: 5)
 - `AUTO_RESTART_CHECK_INTERVAL` - Seconds between watchdog passes (default: 30)
+- `AUTO_RESTART_STARTUP_GRACE` - Seconds after VPN setup finishes before failures count (default: 120)
+- `AUTO_RESTART_SETUP_TIMEOUT` - Seconds to wait for VPN setup before counting failures anyway (default: 600)
+- `HEALTHCHECK_CACHE_MAX_AGE` - Oldest cached health result the Docker `HEALTHCHECK` will report before running the full check itself (default: 90)
 - `NOTIFICATION_WEBHOOK_URL` - Discord/Slack webhooks
 
 **Privoxy (Optional):**
@@ -777,8 +780,27 @@ docker build -t my-nzbgetvpn .
 
 ## 🔒 Security Documentation
 
-- **[VPN Kill Switch Security](docs/VPN_KILLSWITCH_SECURITY.md)** - Enhanced security features and kill switch implementation
+**Kill switch.** `vpn-setup.sh` sets the default iptables and ip6tables policies to DROP once the tunnel is up. Traffic is allowed only through the tunnel interface, to each VPN server endpoint (every `remote` in an OpenVPN config), on loopback, for established connections, and for the configured UI ports, `LAN_NETWORK` and `ADDITIONAL_PORTS`. DNS queries on `eth0` are dropped, so lookups only go through the tunnel. If the tunnel stops passing traffic, the auto-restart watchdog (`ENABLE_AUTO_RESTART=true`) restarts it and, after `MAX_RESTART_ATTEMPTS`, exits the container so Docker or Kubernetes replaces it. `./test-killswitch.sh <container>` checks the firewall rules against a running container.
+
 - **[Docker Scout Improvements](docs/DOCKER_SCOUT_IMPROVEMENTS.md)** - Security hardening recommendations
+
+## 🧪 Running the Tests
+
+The fast tests run in CI on every pull request and before each release is published:
+
+```bash
+python3 test-metrics-render.py
+
+docker build -t nzbgetvpn:test .
+docker run --rm --entrypoint bash -v "$PWD:/src:ro" nzbgetvpn:test /src/test-auto-restart.sh
+docker run --rm --entrypoint bash -v "$PWD:/src:ro" nzbgetvpn:test /src/test-healthcheck-cached.sh
+```
+
+`test-dead-tunnel.sh` is an end-to-end test against real containers and is run by hand. It needs no VPN account: it stands in a fake `tun0`, kills it with an iptables rule, and checks the metrics and that the watchdog exits the container. It takes about 10 minutes and needs a Docker host that allows `NET_ADMIN` and `/dev/net/tun`:
+
+```bash
+./test-dead-tunnel.sh nzbgetvpn:test
+```
 
 ## 🤝 Contributing & Support
 

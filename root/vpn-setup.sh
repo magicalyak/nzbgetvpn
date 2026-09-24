@@ -727,14 +727,8 @@ else
   echo "[INFO] Privoxy is disabled."
 fi
 
-# Execute enhanced killswitch script for additional protection
-if [ -f /root/vpn-killswitch.sh ]; then
-    echo "[INFO] Executing enhanced VPN killswitch script..."
-    /root/vpn-killswitch.sh || echo "[WARN] Killswitch script had warnings but continuing"
-fi
-
 # Create a flag file indicating VPN script completed successfully
-# This is mostly for the healthcheck or external monitoring.
+# The auto-restart watchdog waits for it before counting failures.
 touch /tmp/vpn_setup_complete
 echo "[INFO] VPN setup script finished. Container should now be routing traffic through VPN (if connection was successful)."
 echo "[INFO] Final VPN interface: $(cat $VPN_INTERFACE_FILE)"

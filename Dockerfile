@@ -127,6 +127,7 @@ COPY root/vpn-setup.sh /etc/cont-init.d/50-vpn-setup
 
 # Copy enhanced healthcheck and monitoring scripts
 COPY root/healthcheck.sh /root/healthcheck.sh
+COPY root/healthcheck-cached.sh /root/healthcheck-cached.sh
 COPY root/vpn-probe.sh /root/vpn-probe.sh
 COPY root/monitoring-server.py /root/monitoring-server.py
 COPY root/auto-restart.sh /root/auto-restart.sh
@@ -156,13 +157,14 @@ RUN mkdir -p /etc/s6-overlay/s6-rc.d/user/contents.d && \
     touch /etc/s6-overlay/s6-rc.d/user/contents.d/openvpn
 
 # Make scripts executable
-RUN chmod +x /etc/cont-init.d/* /root/healthcheck.sh /root/monitoring-server.py /root/auto-restart.sh \
+RUN chmod +x /etc/cont-init.d/* /root/healthcheck.sh /root/healthcheck-cached.sh /root/monitoring-server.py /root/auto-restart.sh \
     /root/platform-info.sh /etc/s6-overlay/s6-rc.d/privoxy/run /etc/s6-overlay/s6-rc.d/monitoring/run \
     /etc/s6-overlay/s6-rc.d/auto-restart/run /etc/s6-overlay/s6-rc.d/openvpn/run
 
-# Enhanced healthcheck with more frequent checks and longer timeout for monitoring features
+# Reports the monitoring server's cached health check result, and only runs
+# the full check itself when that result is missing or stale
 HEALTHCHECK --interval=30s --timeout=15s --start-period=2m --retries=3 \
-  CMD /root/healthcheck.sh
+  CMD /root/healthcheck-cached.sh
 
 # Expose monitoring port (optional, can be mapped in docker run/compose)
 EXPOSE 8080

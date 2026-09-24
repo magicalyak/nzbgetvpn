@@ -82,18 +82,9 @@ else
     print_result "VPN interface active" "FAIL" "Interface $VPN_INTERFACE not found"
 fi
 
-# Test 4: Check VPN monitoring service
+# Test 4: Test outbound connectivity through VPN only
 echo ""
-echo "Test 4: Checking VPN monitoring service..."
-if exec_container s6-svstat /var/run/s6/services/vpn-monitor 2>/dev/null | grep -q "up"; then
-    print_result "VPN monitor service" "PASS"
-else
-    print_result "VPN monitor service" "FAIL" "Service not running"
-fi
-
-# Test 5: Test outbound connectivity through VPN only
-echo ""
-echo "Test 5: Testing outbound connectivity..."
+echo "Test 4: Testing outbound connectivity..."
 # Try to ping through VPN interface
 if exec_container ping -c 1 -W 2 -I "$VPN_INTERFACE" 1.1.1.1 &>/dev/null; then
     print_result "VPN connectivity" "PASS"
@@ -101,9 +92,9 @@ else
     print_result "VPN connectivity" "WARN" "Cannot reach internet through VPN"
 fi
 
-# Test 6: Verify eth0 blocks non-allowed traffic
+# Test 5: Verify eth0 blocks non-allowed traffic
 echo ""
-echo "Test 6: Checking eth0 restrictions..."
+echo "Test 5: Checking eth0 restrictions..."
 ETH0_DROP_RULE=$(exec_container iptables -L OUTPUT -n | grep -E "DROP.*eth0" | wc -l)
 if [ "$ETH0_DROP_RULE" -gt 0 ]; then
     print_result "eth0 traffic blocking" "PASS"
@@ -111,38 +102,9 @@ else
     print_result "eth0 traffic blocking" "FAIL" "No DROP rule for eth0"
 fi
 
-# Test 7: Simulate VPN failure and check if NZBGet stops
+# Test 6: Check for packet leaks with tcpdump (if available)
 echo ""
-echo "Test 7: Simulating VPN failure (this may take up to 90 seconds)..."
-echo "  Stopping VPN interface..."
-
-# Save current state
-NZBGET_RUNNING_BEFORE=$(exec_container pgrep nzbget | wc -l)
-
-# Bring down VPN interface
-exec_container ip link set "$VPN_INTERFACE" down 2>/dev/null || true
-
-# Wait for monitoring to detect failure (based on VPN_CHECK_INTERVAL and VPN_MAX_FAILURES)
-echo "  Waiting for monitor to detect failure..."
-sleep 100
-
-# Check if NZBGet was stopped
-NZBGET_RUNNING_AFTER=$(exec_container pgrep nzbget | wc -l)
-VPN_FAIL_FLAG=$(exec_container ls /tmp/vpn_failed_nzbget_stopped 2>/dev/null | wc -l)
-
-if [ "$NZBGET_RUNNING_AFTER" -eq 0 ] && [ "$VPN_FAIL_FLAG" -eq 1 ]; then
-    print_result "Auto-stop on VPN failure" "PASS"
-else
-    print_result "Auto-stop on VPN failure" "FAIL" "NZBGet still running or flag not set"
-fi
-
-# Restore VPN interface
-echo "  Restoring VPN interface..."
-exec_container ip link set "$VPN_INTERFACE" up 2>/dev/null || true
-
-# Test 8: Check for packet leaks with tcpdump (if available)
-echo ""
-echo "Test 8: Checking for packet leaks on eth0..."
+echo "Test 6: Checking for packet leaks on eth0..."
 if exec_container which tcpdump &>/dev/null; then
     # Start tcpdump in background
     exec_container timeout 5 tcpdump -i eth0 -c 10 'not port 6789 and not port 8080 and not arp' 2>/dev/null > /tmp/tcpdump_out &
@@ -166,25 +128,14 @@ else
     echo "  Skipping (tcpdump not available)"
 fi
 
-# Test 9: DNS resolution test
+# Test 7: DNS resolution test
 echo ""
-echo "Test 9: Testing DNS resolution..."
+echo "Test 7: Testing DNS resolution..."
 # DNS should fail on eth0 but work through VPN
 if exec_container nslookup google.com 2>/dev/null | grep -q "Address:"; then
     print_result "DNS through VPN" "PASS"
 else
     print_result "DNS through VPN" "FAIL" "DNS resolution not working"
-fi
-
-# Test 10: Check monitoring alerts log
-echo ""
-echo "Test 10: Checking monitoring alerts..."
-if exec_container test -f /tmp/vpn_monitor_alerts.log; then
-    ALERT_COUNT=$(exec_container wc -l < /tmp/vpn_monitor_alerts.log)
-    print_result "Alert logging" "PASS"
-    echo "  Found $ALERT_COUNT alerts in log"
-else
-    print_result "Alert logging" "WARN" "No alert log found"
 fi
 
 # Summary
@@ -208,9 +159,6 @@ else
         echo "=================="
         echo "IPTables Rules:"
         exec_container iptables -L -n -v | head -30
-        echo ""
-        echo "VPN Monitor Log (last 20 lines):"
-        exec_container tail -20 /tmp/vpn-monitor.log 2>/dev/null || echo "Log not found"
     fi
     exit 1
 fi

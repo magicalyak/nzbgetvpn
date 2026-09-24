@@ -138,7 +138,8 @@ run_container "$C2" "${SUBNET_PREFIX}.11" \
     -e MAX_RESTART_ATTEMPTS=1 \
     -e RESTART_COOLDOWN_SECONDS=0 \
     -e RESTART_FAILURE_THRESHOLD=1 \
-    -e AUTO_RESTART_CHECK_INTERVAL=5
+    -e AUTO_RESTART_CHECK_INTERVAL=5 \
+    -e AUTO_RESTART_STARTUP_GRACE=10
 expect "tunnel healthy before the fault" "$(wait_metric "$C2" nzbgetvpn_vpn_connected 1 180)" 1
 docker exec "$C2" iptables -I OUTPUT -o tun0 -j DROP
 exit_code=timeout
