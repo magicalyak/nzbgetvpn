@@ -2,7 +2,7 @@
 
 All notable changes to nzbgetvpn will be documented in this file.
 
-## [v26.2.5] - 2026-09-24
+## [v26.2.5] - 2026-09-25
 
 ### Fixed
 - **Hostname VPN servers could not be resolved on Docker networks**: `vpn-setup.sh` flushed the whole nat and mangle tables before building the kill switch. On user-defined Docker networks (Compose's default), `/etc/resolv.conf` points at Docker's embedded DNS server, 127.0.0.11, which only works through the `DOCKER_OUTPUT` and `DOCKER_POSTROUTING` nat rules Docker adds inside the container. The flush removed them and Docker does not put them back, so every lookup failed and a hostname `remote` (every `VPN_PROVIDER=pia` config) or WireGuard `Endpoint` got no kill switch exception. The nat table is no longer touched, and only the mangle rules `vpn-setup.sh` adds itself (tagged `vpn-setup`) are removed on a rerun. Kubernetes was not affected. The bug predates v26.2.4. It only shows when the host's iptables and the image's use the same backend (nf_tables), which is the case on current distributions.
