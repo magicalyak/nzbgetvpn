@@ -2,6 +2,19 @@
 
 All notable changes to nzbgetvpn will be documented in this file.
 
+## [v26.2.5] - 2026-09-25
+
+### Fixed
+- **Hostname VPN servers could not be resolved on Docker networks**: `vpn-setup.sh` flushed the whole nat and mangle tables before building the kill switch. On user-defined Docker networks (Compose's default), `/etc/resolv.conf` points at Docker's embedded DNS server, 127.0.0.11, which only works through the `DOCKER_OUTPUT` and `DOCKER_POSTROUTING` nat rules Docker adds inside the container. The flush removed them and Docker does not put them back, so every lookup failed and a hostname `remote` (every `VPN_PROVIDER=pia` config) or WireGuard `Endpoint` got no kill switch exception. The nat table is no longer touched, and only the mangle rules `vpn-setup.sh` adds itself (tagged `vpn-setup`) are removed on a rerun. Kubernetes was not affected. The bug predates v26.2.4. It only shows when the host's iptables and the image's use the same backend (nf_tables), which is the case on current distributions.
+- **DNS through Docker's embedded server bypassed the kill switch**: since Docker 28, the embedded server forwards queries for the host's nameservers from the host's network namespace, outside the container's firewall and the tunnel. It is now used only while the VPN servers are resolved. After that, traffic to 127.0.0.11 is dropped. `--dns` servers, which Docker queries from inside the container, are allowed on `eth0` during that step. The OpenVPN up script already replaced `/etc/resolv.conf`. A WireGuard config without `DNS =` and without `NAME_SERVERS` now falls back to 1.1.1.1 and 8.8.8.8 through the tunnel, as OpenVPN does.
+
+### Changed
+- **Dockerfile defaults**: `ENV X=${X:-default}` only ever gave the default, since none of these variables is a build argument, and each line raised an `UndefinedVar` lint warning (35 in total). They are now plain `ENV X=default`. The image's environment is unchanged.
+
+### CI
+- `test-vpn-setup-bootstrap.sh` models the nat and mangle tables. New cases seed Docker's rules and resolv.conf for 127.0.0.11 (host nameserver and `--dns`), for OpenVPN at boot and on a rerun and for WireGuard. They check that Docker's rules survive, lookups get through during the bootstrap and 127.0.0.11 is closed afterwards.
+- The Test workflow runs `docker buildx build --check` and fails on any warning. It also prints the image's default environment.
+
 ## [v26.2.4] - 2026-09-24
 
 ### Fixed

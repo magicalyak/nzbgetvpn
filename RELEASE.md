@@ -1,5 +1,17 @@
 # nzbgetvpn Release Notes
 
+## v26.2.5 (2026-09-25)
+**Fix: hostname VPN servers resolve on Docker networks, without a DNS leak**
+
+- `vpn-setup.sh` no longer flushes the nat table, which removed the rules behind Docker's embedded DNS server (127.0.0.11) on Compose networks. Hostname remotes, including every `VPN_PROVIDER=pia` config, can be resolved again. Kubernetes was not affected.
+- 127.0.0.11 is only used to resolve the VPN servers and is blocked once the kill switch is built, because Docker 28 and later forward its queries from the host, outside the tunnel.
+- WireGuard without `DNS =` or `NAME_SERVERS` falls back to 1.1.1.1 and 8.8.8.8 through the tunnel.
+- The Dockerfile uses plain ENV defaults (same values), and CI fails on Dockerfile lint warnings.
+
+See CHANGELOG.md for the full list.
+
+---
+
 ## v26.2.3 (2026-09-24)
 **Fix: fallback VPN servers can connect, no false failures at startup, and one health probe instead of two**
 

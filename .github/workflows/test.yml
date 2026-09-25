@@ -26,6 +26,10 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
+      # Fails on any Dockerfile lint warning (UndefinedVar and the like)
+      - name: Dockerfile checks
+        run: docker buildx build --check --build-arg BUILDKIT_DOCKERFILE_CHECK=error=true .
+
       - name: Build image
         uses: docker/build-push-action@v7
         with:
@@ -36,6 +40,9 @@ jobs:
           load: true
           cache-from: type=gha,scope=linux-amd64
           provenance: false
+
+      - name: Image default environment
+        run: docker run --rm --entrypoint env nzbgetvpn:test | grep -v -e '^HOSTNAME=' -e '^HOME=' | sort
 
       # These need the image's GNU stat, timeout and jq
       - name: Auto-restart watchdog tests
