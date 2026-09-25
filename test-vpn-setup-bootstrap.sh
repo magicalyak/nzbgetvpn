@@ -10,6 +10,10 @@
 # "File exists", which stopped the script (set -e) before the tunnel and the VPN
 # servers were allowed, so the restart could never succeed.
 #
+# It also flushed the nat and mangle tables. On Docker user-defined networks
+# (Compose's default) the nat table holds the rules that make Docker's embedded DNS
+# server at 127.0.0.11 work, so hostname VPN servers could not be resolved there.
+#
 # This runs the shipped vpn-setup.sh from start to finish, then the OpenVPN s6 run
 # script, with iptables, ip6tables, ip, openvpn, wg-quick and nslookup stubbed.
 # After every change to OUTPUT the stub evaluates the chain for traffic that must
@@ -120,26 +124,34 @@ echo "$(cat "$dir/policy.OUTPUT" 2>/dev/null || echo ACCEPT) policy"
 EOF
 
 # iptables with state: one file per chain, policies in $FW/<tool>/policy.CHAIN, and
-# every policy change appended to $FW/policy-history. Only the filter table is
-# modelled. Once OUTPUT's policy has been DROP (or $FW/armed exists), every change
-# to OUTPUT is followed by the leak probes, and any ACCEPT goes to $FW/leaks.
+# every policy change appended to $FW/policy-history. The filter table lives in
+# $FW/<tool>, other tables in $FW/<tool>.<table>. Once OUTPUT's policy has been DROP
+# (or $FW/armed exists), every change to filter OUTPUT is followed by the leak
+# probes, and any ACCEPT goes to $FW/leaks.
 cat > "$WORK/bin/iptables" <<'EOF'
 #!/bin/bash
 tool=$(basename "$0")
-dir="$FW/$tool"
-mkdir -p "$dir"
+table=filter
 if [ "$1" = "-t" ]; then
-    [ "$2" = "filter" ] || exit 0
+    table=$2
     shift 2
 fi
-call="$tool $*"
+dir="$FW/$tool"
+[ "$table" = filter ] || dir="$FW/$tool.$table"
+mkdir -p "$dir"
+call="$tool -t $table $*"
 op="$1" chain="$2"
 shift 2
-touch "$dir/$chain"
+[ -n "$chain" ] && touch "$dir/$chain"
 case "$op" in
     -P) echo "$1" > "$dir/policy.$chain"; echo "$tool $chain $1" >> "$FW/policy-history" ;;
-    -F) : > "$dir/$chain"
-        if [ "$chain" = OUTPUT ] && [ ! -f "$FW/flag-at-flush" ]; then
+    -F) if [ -z "$chain" ]; then
+            for f in "$dir"/*; do case "$f" in */policy.*) ;; *) [ -f "$f" ] && : > "$f" ;; esac; done
+        else
+            : > "$dir/$chain"
+        fi
+        echo "$table ${chain:-all}" >> "$FW/flushes"
+        if [ "$table" = filter ] && [ "$chain" = OUTPUT ] && [ ! -f "$FW/flag-at-flush" ]; then
             [ -f /tmp/vpn_setup_complete ] && echo present > "$FW/flag-at-flush" || echo absent > "$FW/flag-at-flush"
         fi ;;
     -A) echo "$*" >> "$dir/$chain" ;;
@@ -153,7 +165,7 @@ case "$op" in
     *) exit 1 ;;
 esac
 rc=$?
-if [ "$tool" = iptables ] && [ "$chain" = OUTPUT ]; then
+if [ "$tool" = iptables ] && [ "$table" = filter ] && [ "$chain" = OUTPUT ]; then
     [ "$op" = -P ] && [ "$1" = DROP ] && touch "$FW/armed"
     case "$op" in -P|-F|-A|-I|-D)
         if [ -f "$FW/armed" ]; then
@@ -223,17 +235,41 @@ EOF
 
 # Answers only if the firewall lets the query out: to the first nameserver, over
 # eth0 for a cluster (10/8) nameserver or before the tunnel exists.
+# Docker's embedded DNS server (127.0.0.11) only answers while Docker's nat rules
+# are in place: OUTPUT jumps to DOCKER_OUTPUT, which DNATs port 53 to the port the
+# server listens on, over lo. It forwards to the first "# ExtServers:" entry, from
+# the host's namespace for host(...), from this one (eth0) otherwise.
 cat > "$WORK/bin/nslookup" <<'EOF'
 #!/bin/bash
+blocked() {
+    echo "$1" >> "$FW/dns-blocked"
+    echo ";; connection timed out; no servers could be reached"; exit 1
+}
 ns=$(awk '$1 == "nameserver" { print $2; exit }' /etc/resolv.conf)
-out=eth0
-if [ -f "$FW/tunnel-up" ] && [ "${ns#10.}" = "$ns" ]; then out=$(cat "$FW/tunnel-up"); fi
-verdict=$(fweval "$FW/iptables" "$out" "$ns" udp 53 NEW ORIGINAL)
+out=eth0 dport=53
+if [ "$ns" = 127.0.0.11 ]; then
+    nat="$FW/iptables.nat"
+    grep -qxE -- '-d 127\.0\.0\.11(/32)? -j DOCKER_OUTPUT' "$nat/OUTPUT" 2>/dev/null ||
+        blocked "$1 via $ns: nat OUTPUT has no jump to DOCKER_OUTPUT"
+    dport=$(sed -n 's/.*-p udp .*--dport 53 -j DNAT --to-destination 127\.0\.0\.11:\([0-9]*\)$/\1/p' "$nat/DOCKER_OUTPUT" 2>/dev/null | head -1)
+    [ -n "$dport" ] || blocked "$1 via $ns: DOCKER_OUTPUT has no DNAT for udp/53"
+    out=lo
+elif [ -f "$FW/tunnel-up" ] && [ "${ns#10.}" = "$ns" ]; then
+    out=$(cat "$FW/tunnel-up")
+fi
+verdict=$(fweval "$FW/iptables" "$out" "$ns" udp "$dport" NEW ORIGINAL)
 case "$verdict" in
     ACCEPT*) ;;
-    *) echo "$1 via $ns on $out: $verdict" >> "$FW/dns-blocked"
-       echo ";; connection timed out; no servers could be reached"; exit 1 ;;
+    *) blocked "$1 via $ns on $out: $verdict" ;;
 esac
+if [ "$ns" = 127.0.0.11 ]; then
+    up=$(sed -n 's/^# ExtServers: \[\([^] ]*\).*/\1/p' /etc/resolv.conf)
+    case "$up" in
+        host\(*|"") ;;
+        *) verdict=$(fweval "$FW/iptables" eth0 "$up" udp 53 NEW ORIGINAL)
+           case "$verdict" in ACCEPT*) ;; *) blocked "$1 via $ns, forwarded to $up on eth0: $verdict" ;; esac ;;
+    esac
+fi
 case "$1" in
     vpn.example.net) echo "Server: $ns"; echo "Address: $ns#53"; echo "Name: vpn.example.net"
                      echo "Address: 198.51.100.20"; echo "Address: 198.51.100.21" ;;
@@ -412,6 +448,117 @@ expect_eq "$(grep -c -- '-o eth0 -d 198.51.100.2[01] -p udp --dport 51820 -m com
     "when wg-quick runs, every endpoint address is reachable"
 expect_eq "$(verdict "$FW/iptables" 198.51.100.20 udp 51820) $(verdict "$FW/iptables" 198.51.100.21 udp 51820)" \
     "ACCEPT ACCEPT" "the kill switch keeps every endpoint address"
+
+# ---------------------------------------------------------------------------
+# Docker user-defined networks (Compose's default): resolv.conf points at Docker's
+# embedded DNS server, which works through nat rules Docker adds in the container.
+# The rules and resolv.conf are as Docker Engine writes them (libnetwork
+# resolver_unix.go setupIptablesNAT, internal/resolvconf).
+DOCKER_UDP_PORT=52981
+seed_docker_dns() {
+    local nat="$FW/iptables.nat"
+    mkdir -p "$nat" "$FW/iptables.mangle"
+    echo "-d 127.0.0.11/32 -j DOCKER_OUTPUT" > "$nat/OUTPUT"
+    echo "-d 127.0.0.11/32 -j DOCKER_POSTROUTING" > "$nat/POSTROUTING"
+    printf '%s\n' "-d 127.0.0.11/32 -p tcp -m tcp --dport 53 -j DNAT --to-destination 127.0.0.11:41365" \
+        "-d 127.0.0.11/32 -p udp -m udp --dport 53 -j DNAT --to-destination 127.0.0.11:$DOCKER_UDP_PORT" > "$nat/DOCKER_OUTPUT"
+    printf '%s\n' "-s 127.0.0.11/32 -p tcp -m tcp --sport 41365 -j SNAT --to-source :53" \
+        "-s 127.0.0.11/32 -p udp -m udp --sport $DOCKER_UDP_PORT -j SNAT --to-source :53" > "$nat/DOCKER_POSTROUTING"
+    rm -rf "$WORK/docker-nat" && cp -R "$nat" "$WORK/docker-nat"
+    # A mangle rule vpn-setup.sh does not own, like the ones wg-quick adds.
+    echo '-p udp -m comment --comment "wg-quick(8) rule for wg0" -j CONNMARK --restore-mark --nfmask 0xffffffff --ctmask 0xffffffff' \
+        > "$FW/iptables.mangle/PREROUTING"
+}
+
+# docker_resolv EXTSERVERS, e.g. "host(192.168.65.7)" or "1.1.1.1" (--dns 1.1.1.1).
+docker_resolv() {
+    cat > /etc/resolv.conf <<EOF
+# Generated by Docker Engine.
+# This file can be edited; Docker Engine will not make further changes once it
+# has been modified.
+
+nameserver 127.0.0.11
+options ndots:0
+
+# Based on host file: '/etc/resolv.conf' (internal resolver)
+# ExtServers: [$1]
+# Overrides: []
+# Option ndots from: internal
+EOF
+}
+
+check_docker_rules() {
+    expect_eq "$(diff -r "$WORK/docker-nat" "$FW/iptables.nat" 2>&1)" "" "Docker's nat rules for 127.0.0.11 are untouched"
+    expect_eq "$(grep -v '^filter ' "$FW/flushes" 2>/dev/null || true)" "" "no chain outside the filter table is flushed"
+    expect_eq "$(grep -c 'wg-quick(8)' "$FW/iptables.mangle/PREROUTING" || true)" "1" "a mangle rule vpn-setup.sh does not own is kept"
+    expect_eq "$(cat "$FW"/iptables.mangle/PREROUTING "$FW"/iptables.mangle/OUTPUT | grep -c -- '--comment vpn-setup ' || true)" "4" \
+        "vpn-setup.sh's own mangle rules are there once (NZBGet and monitoring)"
+}
+
+docker_dns_verdict() { fweval "$1" lo 127.0.0.11 udp "$DOCKER_UDP_PORT" NEW ORIGINAL | cut -d' ' -f1; }
+
+echo ""
+echo "--- OpenVPN, hostname remote, Docker embedded DNS: boot ---"
+reset_state
+seed_docker_dns
+docker_resolv "host(192.168.65.7)"
+run_setup VPN_CLIENT=openvpn VPN_CONFIG="$WORK/host.ovpn" VPN_USER=u VPN_PASS=p
+check_common
+check_bootstrap
+check_docker_rules
+expect_eq "$(grep -c 'dport 53' "$FW/at-bootstrap/OUTPUT" || true)" "0" \
+    "while bootstrapping, no DNS is opened on eth0 (the host's nameserver is queried from the host)"
+expect_eq "$(grep -E '^remote' /tmp/config.ovpn)" "remote 198.51.100.20 1198
+remote 198.51.100.21 1198" "the hostname is resolved through 127.0.0.11 and pinned"
+launch_openvpn
+check_launch_closed
+expect_eq "$(docker_dns_verdict "$FW/at-launch")" "DROP" \
+    "at launch, Docker's DNS server is closed (it forwards from the host's namespace)"
+env -u NAME_SERVERS bash /etc/openvpn/update-resolv.sh > /dev/null 2>&1
+expect_eq "$(awk '$1 == "nameserver" { print $2 }' /etc/resolv.conf | tr '\n' ' ')" "1.1.1.1 8.8.8.8 " \
+    "once the tunnel is up, resolv.conf no longer points at 127.0.0.11"
+
+echo ""
+echo "--- The same container, rerun in place by the watchdog ---"
+start_rerun
+docker_resolv "host(192.168.65.7)" # restored by the OpenVPN down script
+run_setup VPN_CLIENT=openvpn VPN_CONFIG="$WORK/host.ovpn" VPN_USER=u VPN_PASS=p
+check_common
+check_bootstrap
+check_docker_rules
+launch_openvpn
+check_launch_closed
+expect_eq "$(docker_dns_verdict "$FW/at-launch")" "DROP" "at relaunch, Docker's DNS server is closed"
+
+echo ""
+echo "--- OpenVPN, hostname remote, Docker embedded DNS with --dns 1.1.1.1 ---"
+reset_state
+seed_docker_dns
+docker_resolv "1.1.1.1"
+run_setup VPN_CLIENT=openvpn VPN_CONFIG="$WORK/host.ovpn" VPN_USER=u VPN_PASS=p
+check_common
+check_bootstrap
+check_docker_rules
+expect_eq "$(grep 'dport 53' "$FW/at-bootstrap/OUTPUT" | sort)" "-o eth0 -d 1.1.1.1 -p tcp --dport 53 -m comment --comment vpn-bootstrap -j ACCEPT
+-o eth0 -d 1.1.1.1 -p udp --dport 53 -m comment --comment vpn-bootstrap -j ACCEPT" \
+    "while bootstrapping, DNS on eth0 is open only to the --dns server Docker forwards to"
+launch_openvpn
+check_launch_closed
+
+echo ""
+echo "--- WireGuard, hostname endpoint, Docker embedded DNS, no DNS configured ---"
+reset_state
+seed_docker_dns
+docker_resolv "host(192.168.65.7)"
+run_setup VPN_CLIENT=wireguard VPN_CONFIG="$WORK/wg0.conf"
+check_common
+check_docker_rules
+check_launch_closed
+expect_eq "$(grep -c -- '-o eth0 -d 198.51.100.2[01] -p udp --dport 51820 -m comment --comment vpn-bootstrap -j ACCEPT' "$FW/at-launch/OUTPUT")" "2" \
+    "when wg-quick runs, every endpoint address is reachable"
+expect_eq "$(docker_dns_verdict "$FW/iptables")" "DROP" "Docker's DNS server is closed once the kill switch is built"
+expect_eq "$(awk '$1 == "nameserver" { print $2 }' /etc/resolv.conf | tr '\n' ' ')" "1.1.1.1 8.8.8.8 " \
+    "resolv.conf no longer points at 127.0.0.11"
 
 # ---------------------------------------------------------------------------
 echo ""
