@@ -12,6 +12,19 @@ See CHANGELOG.md for the full list.
 
 ---
 
+## v26.2.4 (2026-09-24)
+**Fix: the kill switch stays closed while it is rebuilt, and services start after it**
+
+- Watchdog VPN restarts can succeed. `ip route add` for `LAN_NETWORK` failed on a rerun and stopped `vpn-setup.sh` before the tunnel was allowed. It now uses `ip route replace`.
+- The firewall policies stay DROP throughout setup and every watchdog rerun. Only loopback, the VPN servers and, for hostname servers, DNS to the configured nameservers are allowed until the kill switch is built.
+- Hostname remotes and WireGuard endpoints get kill switch exceptions. OpenVPN hostnames are pinned to the addresses they resolved to.
+- NZBGet, Privoxy, monitoring, the watchdog and OpenVPN wait for cont-init, so nothing runs before the kill switch exists.
+- Established traffic may leave `eth0` only as replies, so a tunnel connection cannot continue over the default route after the tunnel drops.
+
+See CHANGELOG.md for the full list.
+
+---
+
 ## v26.2.3 (2026-09-24)
 **Fix: fallback VPN servers can connect, no false failures at startup, and one health probe instead of two**
 
