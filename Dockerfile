@@ -17,13 +17,9 @@ ARG BUILD_DATE
 ARG VCS_REF
 ARG VERSION
 
-# Add ARG for VPN credentials
-ARG VPN_USER
-ARG VPN_PASS
-
-# Set ENV from ARG
-ENV VPN_USER=$VPN_USER
-ENV VPN_PASS=$VPN_PASS
+# VPN credentials are runtime settings only (VPN_USER/VPN_PASS, FILE__VPN_USER/
+# FILE__VPN_PASS or /config/openvpn/credentials.txt). A build argument copied into
+# ENV would be stored in the image for anyone who pulls it.
 
 # Additional ENV for runtime variables needed by s6 scripts
 ENV VPN_CLIENT=openvpn

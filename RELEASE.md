@@ -1,5 +1,15 @@
 # nzbgetvpn Release Notes
 
+## v26.2.6 (2026-09-25)
+**Fix: a failed VPN setup leaves only loopback open**
+
+- If `vpn-setup.sh` fails, the firewall is locked down to loopback only instead of keeping the rules used while the kill switch is built. On Docker networks this also closes 127.0.0.11.
+- The Dockerfile no longer takes VPN credentials as build arguments, so they can never be stored in the image. Set them at runtime as before.
+
+See CHANGELOG.md for the full list.
+
+---
+
 ## v26.2.5 (2026-09-25)
 **Fix: hostname VPN servers resolve on Docker networks, without a DNS leak**
 

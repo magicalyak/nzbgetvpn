@@ -2,6 +2,17 @@
 
 All notable changes to nzbgetvpn will be documented in this file.
 
+## [v26.2.6] - 2026-09-25
+
+### Fixed
+- **A failed `vpn-setup.sh` left the bootstrap rules in place**: a failed cont-init script does not stop the container, so NZBGet started on whatever firewall the script had reached. That could include the exceptions for the VPN servers, DNS to the configured nameservers on `eth0` and, on Docker networks, lookups through 127.0.0.11, which Docker 28 and later forward from the host. An EXIT trap now locks the firewall down to loopback only, with 127.0.0.11 dropped, whenever the script fails. The same approach transmissionvpn has used since v4.1.2-r7.
+
+### Removed
+- **`ARG VPN_USER` / `ARG VPN_PASS` in the Dockerfile**: they were copied into `ENV`, so credentials passed at build time would have been stored in the image. Nothing passed them, and the image default was empty. Set them at runtime as before, or use `FILE__VPN_USER` / `FILE__VPN_PASS` or `/config/openvpn/credentials.txt`. The two variables no longer appear in the image's default environment.
+
+### CI
+- `test-vpn-setup-bootstrap.sh` checks that a failed setup leaves only loopback open, including a Docker case that fails after the bootstrap DNS was opened.
+
 ## [v26.2.5] - 2026-09-25
 
 ### Fixed

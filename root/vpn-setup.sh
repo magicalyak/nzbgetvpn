@@ -48,6 +48,36 @@ echo "[INFO] Default VPN interface set to: $(cat $VPN_INTERFACE_FILE)"
 # waits for the finished kill switch.
 rm -f /tmp/vpn_setup_complete
 
+# Fail closed if this script aborts. A failed cont-init script does not stop the
+# container (S6_BEHAVIOUR_IF_STAGE2_FAILS is not set), so NZBGet would start on
+# whatever firewall the script left: the bootstrap rules, which let the VPN servers
+# and, on Docker networks, lookups through 127.0.0.11 out. Leave loopback only.
+# `docker logs` and `docker exec` still work to read the error above.
+# shellcheck disable=SC2329 # invoked by the EXIT trap below
+fail_closed_on_abort() {
+  local rc=$?
+  [ "$rc" -eq 0 ] && return 0
+  echo "[ERROR] vpn-setup.sh failed (exit $rc) before the kill switch was built."
+  echo "[ERROR] Locking the firewall down to loopback only until VPN setup succeeds."
+  local tool
+  for tool in iptables ip6tables; do
+    $tool -P INPUT   DROP 2>/dev/null || true
+    $tool -P OUTPUT  DROP 2>/dev/null || true
+    $tool -P FORWARD DROP 2>/dev/null || true
+    $tool -F INPUT   2>/dev/null || true
+    $tool -F OUTPUT  2>/dev/null || true
+    $tool -F FORWARD 2>/dev/null || true
+    $tool -A INPUT  -i lo -j ACCEPT 2>/dev/null || true
+  done
+  # Docker's embedded DNS server forwards from the host; see the kill switch.
+  iptables -A OUTPUT -o lo -d 127.0.0.11 -j DROP 2>/dev/null || true
+  iptables -A OUTPUT -o lo -j ACCEPT 2>/dev/null || true
+  ip6tables -A OUTPUT -o lo -j ACCEPT 2>/dev/null || true
+  rm -f /tmp/vpn_setup_complete
+  return "$rc"
+}
+trap fail_closed_on_abort EXIT
+
 # VPN server parsing and kill switch exceptions.
 remote_log() { echo "[INFO] $*"; }
 # shellcheck source=root/vpn-remotes.sh
