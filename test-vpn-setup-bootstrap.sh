@@ -206,6 +206,7 @@ case "$args" in
         if grep -q "^$3 " "$routes"; then echo "RTNETLINK answers: File exists" >&2; exit 2; fi
         echo "${args#route add }" >> "$routes" ;;
     "route replace "*)
+        [ -f "$FW/fail-route-replace" ] && { echo "RTNETLINK answers: Network is unreachable" >&2; exit 2; }
         grep -v "^$3 " "$routes" > "$routes.new"; echo "${args#route replace }" >> "$routes.new"; mv "$routes.new" "$routes" ;;
 esac
 exit 0
@@ -571,6 +572,31 @@ expect_eq "$rc" "1" "vpn-setup.sh fails without credentials"
 expect_eq "$(grep -c ACCEPT "$FW/policy-history" || true)" "0" "no policy is set to ACCEPT"
 expect_eq "$(verdict "$FW/iptables" 93.184.216.34 tcp 443) $(verdict "$FW/iptables" 9.9.9.9 udp 53)" "DROP DROP" \
     "internet traffic and outside DNS are dropped after the failure"
+check_failed_closed() {
+    expect_eq "$(head -3 "$FW/leaks" 2>/dev/null)" "" "no internet traffic could leave eth0 at any point"
+    expect_eq "$(cat "$FW/iptables/OUTPUT")" "-o lo -d 127.0.0.11 -j DROP
+-o lo -j ACCEPT" "after the failure, OUTPUT allows loopback only, without Docker's DNS server"
+    expect_eq "$(cat "$FW/iptables/INPUT")" "-i lo -j ACCEPT" "after the failure, INPUT allows loopback only"
+    expect_eq "$(cat "$FW/iptables/policy.OUTPUT") $(cat "$FW/ip6tables/policy.OUTPUT")" "DROP DROP" \
+        "after the failure, the OUTPUT policies are DROP (IPv4 and IPv6)"
+    if [ -f /tmp/vpn_setup_complete ]; then log_fail "no setup completion flag after the failure"; else log_pass "no setup completion flag after the failure"; fi
+}
+check_failed_closed
+
+echo ""
+echo "--- A setup that fails after the bootstrap DNS was opened, Docker embedded DNS ---"
+reset_state
+seed_docker_dns
+docker_resolv "1.1.1.1"
+touch "$FW/fail-route-replace"
+rc=0
+env VPN_CLIENT=openvpn VPN_CONFIG="$WORK/host.ovpn" VPN_USER=u VPN_PASS=p LAN_NETWORK=10.0.0.0/8 bash "$VPN_SETUP" > "$WORK/setup.out" 2>&1 || rc=$?
+expect_eq "$rc" "2" "vpn-setup.sh fails with the error that stopped it"
+expect_eq "$(grep -c 'dport 53' "$FW/at-bootstrap/OUTPUT" || true)" "2" "the bootstrap had opened DNS on eth0 to the --dns server"
+check_failed_closed
+expect_eq "$(verdict "$FW/iptables" 1.1.1.1 udp 53) $(verdict "$FW/iptables" 198.51.100.20 udp 1198) $(docker_dns_verdict "$FW/iptables")" \
+    "DROP DROP DROP" "after the failure, the --dns server, the VPN server and Docker's DNS server are closed"
+expect_eq "$(diff -r "$WORK/docker-nat" "$FW/iptables.nat" 2>&1)" "" "Docker's nat rules for 127.0.0.11 are untouched"
 
 echo ""
 if [ "$FAILED" = true ]; then
