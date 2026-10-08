@@ -1,5 +1,16 @@
 # nzbgetvpn Release Notes
 
+## v26.2.7 (2026-10-08)
+**Fix: the firewall is locked from the moment the container starts**
+
+- A new entrypoint blocks everything but loopback before s6-overlay's `/init` runs. Until now the container had open network access for the few seconds before `vpn-setup.sh` built the kill switch.
+- `VPN_PROVIDER` config downloads still work. The provider script opens DNS and HTTP(S) for itself and closes them again when it finishes.
+- `DOCKER_MODS` can no longer be installed, since they download before the tunnel exists.
+
+See CHANGELOG.md for the full list.
+
+---
+
 ## v26.2.6 (2026-09-25)
 **Fix: a failed VPN setup leaves only loopback open**
 

@@ -2,6 +2,18 @@
 
 All notable changes to nzbgetvpn will be documented in this file.
 
+## [v26.2.7] - 2026-10-08
+
+### Fixed
+- **The container had unrestricted network access until `vpn-setup.sh` ran**: the kill switch was first applied by cont-init 50. Before that, the base image's init, `01-ensure-vpn-config-dirs` and `02-vpn-provider-setup` ran on the empty, all-ACCEPT firewall that Docker and Kubernetes give a new container, and so did anything exec'd into it. NZBGet itself already waited for cont-init (v26.2.4), so its traffic was not exposed. On a Kubernetes restart, `kubectl exec ... curl https://ipinfo.io/ip` about 2s after the container started returned the host's public address. The image's entrypoint is now `early-killswitch`, which sets the INPUT, FORWARD and OUTPUT policies to DROP for IPv4 and IPv6 with only loopback allowed, then runs `/init`. `vpn-setup.sh` builds its rules from that state as before. Docker's embedded DNS server (127.0.0.11) is on loopback, so hostname VPN servers still resolve. Without `NET_ADMIN` it logs a warning and starts anyway, and `vpn-setup.sh` fails closed as before.
+
+### Changed
+- **`VPN_PROVIDER` downloads**: `02-vpn-provider-setup` now allows DNS (53) and HTTP(S) (80, 443) out for the duration of the script only, removing the rules on every exit path, so the provider's configs and API can still be reached before the tunnel exists.
+- **linuxserver.io Docker mods**: `DOCKER_MODS` are downloaded by the base image's init, which now runs with the firewall locked, so they cannot be installed. Add packages in a derived image instead.
+
+### CI
+- `test-early-killswitch.sh` checks the policies, the loopback rules, the warning without `NET_ADMIN` and that the provider rules are removed. CI also checks that the built image's entrypoint is `early-killswitch`.
+
 ## [v26.2.6] - 2026-09-25
 
 ### Fixed
