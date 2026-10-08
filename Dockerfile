@@ -166,6 +166,12 @@ RUN chmod +x /etc/cont-init.d/* /root/healthcheck.sh /root/healthcheck-cached.sh
     /root/platform-info.sh /etc/s6-overlay/s6-rc.d/privoxy/run /etc/s6-overlay/s6-rc.d/monitoring/run \
     /etc/s6-overlay/s6-rc.d/auto-restart/run /etc/s6-overlay/s6-rc.d/openvpn/run
 
+# Lock the firewall before s6-overlay starts anything, so nothing in the
+# container reaches the network outside the VPN before vpn-setup (cont-init 50)
+# builds the kill switch. See root/early-killswitch.sh.
+COPY --chmod=755 root/early-killswitch.sh /usr/local/bin/early-killswitch
+ENTRYPOINT ["/usr/local/bin/early-killswitch"]
+
 # Reports the monitoring server's cached health check result, and only runs
 # the full check itself when that result is missing or stale
 HEALTHCHECK --interval=30s --timeout=15s --start-period=2m --retries=3 \

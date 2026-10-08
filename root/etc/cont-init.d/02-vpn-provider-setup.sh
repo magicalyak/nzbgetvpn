@@ -20,6 +20,32 @@ echo "[INFO] VPN provider detected: $PROVIDER"
 # Ensure config directories exist
 mkdir -p /config/openvpn /config/wireguard
 
+# The early kill switch (early-killswitch, run before /init) blocks everything
+# but loopback until vpn-setup builds the real kill switch. The downloads below
+# have to happen before the tunnel exists, so open DNS and HTTP(S) for this
+# script only and close it again on every exit path, before the next cont-init
+# script runs.
+PROVIDER_NET_TAG="vpn-provider-setup"
+provider_net() {
+  local action="$1" cmd rule
+  for cmd in iptables ip6tables; do
+    command -v "$cmd" >/dev/null 2>&1 || continue
+    for rule in "OUTPUT -p udp --dport 53" "OUTPUT -p tcp --dport 53" \
+                "OUTPUT -p tcp --dport 80" "OUTPUT -p tcp --dport 443" \
+                "INPUT -m conntrack --ctstate ESTABLISHED,RELATED"; do
+      # shellcheck disable=SC2086 # rule is a list of iptables arguments
+      if [ "$action" = open ]; then
+        "$cmd" -A $rule -m comment --comment "$PROVIDER_NET_TAG" -j ACCEPT 2>/dev/null || true
+      else
+        while "$cmd" -D $rule -m comment --comment "$PROVIDER_NET_TAG" -j ACCEPT 2>/dev/null; do :; done
+      fi
+    done
+  done
+}
+provider_net open
+trap 'provider_net close' EXIT
+echo "[INFO] Allowed DNS and HTTP(S) out while the provider config is downloaded."
+
 case "$PROVIDER" in
   nordvpn)
     echo "[INFO] Setting up NordVPN..."

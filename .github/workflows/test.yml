@@ -56,3 +56,8 @@ jobs:
 
       - name: s6 service dependency tests
         run: docker run --rm --entrypoint bash -v "$PWD:/src:ro" nzbgetvpn:test /src/test-s6-dependencies.sh
+
+      - name: Early kill switch tests
+        run: |
+          docker run --rm --entrypoint bash -v "$PWD:/src:ro" nzbgetvpn:test /src/test-early-killswitch.sh
+          test "$(docker image inspect nzbgetvpn:test --format '{{json .Config.Entrypoint}}')" = '["/usr/local/bin/early-killswitch"]'
