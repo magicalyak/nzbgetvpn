@@ -2,6 +2,11 @@
 
 All notable changes to nzbgetvpn will be documented in this file.
 
+## [v26.3.0] - 2026-10-14
+
+### Updated
+- **Base Image**: Updated to LinuxServer NZBGet v26.3-ls267 (from v26.2-ls249). Moves NZBGet from the 26.2 to the 26.3 upstream release: hardened web auth token generation and unpack-dir symlink handling, fixes for segfaults and data races and a SkipWrite spin loop, per-feed certificate verification, and 7-Zip 26.02 / UnRAR 7.23. No changes in this repo.
+
 ## [v26.2.7] - 2026-10-08
 
 ### Fixed

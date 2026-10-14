@@ -1,5 +1,16 @@
 # nzbgetvpn Release Notes
 
+## v26.3.0 (2026-10-14)
+**Update: NZBGet 26.3**
+
+- Base image is now LinuxServer NZBGet v26.3-ls267 (was v26.2-ls249).
+- Upstream 26.3 hardens web auth token generation and unpack-dir symlink handling, fixes segfaults, data races and a SkipWrite spin loop, adds per-feed certificate verification, and updates 7-Zip to 26.02 and UnRAR to 7.23.
+- No changes to the VPN, kill switch or monitoring.
+
+See CHANGELOG.md for the full list.
+
+---
+
 ## v26.2.7 (2026-10-08)
 **Fix: the firewall is locked from the moment the container starts**
 
