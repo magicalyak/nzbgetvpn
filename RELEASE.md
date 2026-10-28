@@ -1,5 +1,16 @@
 # nzbgetvpn Release Notes
 
+## v26.3.1 (2026-10-28)
+**Update: base image security fixes**
+
+- Base image is now LinuxServer NZBGet v26.3-ls269 (was v26.3-ls267). NZBGet is still 26.3.
+- Picks up libexpat 2.9.0, which fixes CVE-2026-102633 and CVE-2026-77214, along with c-ares, musl, ca-certificates and tzdata updates.
+- No changes to the VPN, kill switch or monitoring.
+
+See CHANGELOG.md for the full list.
+
+---
+
 ## v26.3.0 (2026-10-14)
 **Update: NZBGet 26.3**
 

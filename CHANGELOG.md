@@ -2,6 +2,11 @@
 
 All notable changes to nzbgetvpn will be documented in this file.
 
+## [v26.3.1] - 2026-10-28
+
+### Updated
+- **Base Image**: Updated to LinuxServer NZBGet v26.3-ls269 (from v26.3-ls267). Same NZBGet 26.3; Alpine package updates include libexpat 2.9.0 (CVE-2026-102633, CVE-2026-77214), c-ares 1.34.9, musl 1.2.6-r3, ca-certificates 20261020 and tzdata 2026e. No changes in this repo.
+
 ## [v26.3.0] - 2026-10-14
 
 ### Updated
