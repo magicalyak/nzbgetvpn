@@ -42,15 +42,27 @@ api_up() { rpc version | grep -q '"result"'; }
 
 wait_for() {  # wait_for <yes|no> <command...>: poll until the command's success matches
     local want=$1 i; shift
-    for i in $(seq 1 50); do
+    for i in $(seq 1 10); do
         if "$@" >/dev/null 2>&1; then [[ $want == yes ]] && return 0; else [[ $want == no ]] && return 0; fi
         sleep 0.2
     done
     return 1
 }
 
-start_nzbget() { "$NZBGET" -D -c "$CONF" "$@" >/dev/null 2>&1; wait_for yes api_up || fail "NZBGet did not start"; }
-stop_nzbget()  { "$NZBGET" -c "$CONF" -Q >/dev/null 2>&1; wait_for no api_up || fail "NZBGet did not stop"; }
+start_nzbget() {
+    local i
+    "$NZBGET" -D -c "$CONF" "$@" >/dev/null 2>&1
+    for i in $(seq 1 30); do wait_for yes api_up && return 0; done
+    fail "NZBGet did not start"
+}
+stop_nzbget() {  # a busy NZBGet can miss the first request, so repeat it
+    local i
+    for i in $(seq 1 30); do
+        "$NZBGET" -c "$CONF" -Q >/dev/null 2>&1
+        wait_for no api_up && return 0
+    done
+    fail "NZBGet did not stop"
+}
 
 # Value of one series from a fresh scrape, or "absent"
 metric() {
@@ -60,7 +72,7 @@ metric() {
 MONITORING_PORT=$PORT ENABLE_HEALTH_PROBE=false NZBGET_CONF="$CONF" STATUS_FILE="$T/status.json" \
     python3 "$SRC_DIR/root/monitoring-server.py" >"$T/server.log" 2>&1 &
 SERVER_PID=$!
-wait_for yes curl -sf "http://127.0.0.1:$PORT/metrics" || { fail "monitoring server did not start"; cat "$T/server.log"; }
+wait_for yes curl -sf "http://127.0.0.1:$PORT/metrics" || wait_for yes curl -sf "http://127.0.0.1:$PORT/metrics" || { fail "monitoring server did not start"; cat "$T/server.log"; }
 
 echo "NZBGet not running: series are absent, not 0"
 expect "other metrics still served" "$(curl -s "http://127.0.0.1:$PORT/metrics" | grep -c '^nzbgetvpn_healthy ')" 1
@@ -101,7 +113,7 @@ rpc pausedownload >/dev/null
 NZB='<?xml version="1.0" encoding="UTF-8"?><nzb xmlns="http://www.newzbin.com/DTD/2003/nzb"><file poster="t@example.com" date="1790000000" subject="test.bin (1/1)"><groups><group>alt.binaries.test</group></groups><segments><segment bytes="5000000" number="1">test-segment-1@example.com</segment></segments></file></nzb>'
 rpc append "\"test.nzb\",\"$(printf '%s' "$NZB" | base64 | tr -d '\n')\",\"\",0,false,false,\"\",0,\"SCORE\",[]" >/dev/null
 remaining_positive() { [[ "$(metric remaining_bytes)" =~ ^[1-9][0-9]*$ ]]; }
-wait_for yes remaining_positive
+wait_for yes remaining_positive || wait_for yes remaining_positive
 expect "remaining_bytes counts the queued nzb" "$(metric remaining_bytes)" 5000000
 expect "download_paused" "$(metric download_paused)" 1
 
@@ -125,6 +137,7 @@ expect "config_error stays 1 until the next start" "$(metric config_error)" 1
 
 echo
 echo "Clean restart clears the config error"
+rpc pausedownload >/dev/null
 stop_nzbget
 start_nzbget
 expect "config_error" "$(metric config_error)" 0
