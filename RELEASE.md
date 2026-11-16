@@ -1,5 +1,17 @@
 # nzbgetvpn Release Notes
 
+## v26.3.2 (2026-11-16)
+**New: metrics that show when NZBGet is paused**
+
+- `/metrics` now reports NZBGet's own state: `nzbgetvpn_nzbget_download_paused`, `_post_paused`, `_scan_paused`, `_download_rate_bytes`, `_remaining_bytes`, `_server_standby` and `_config_error`.
+- NZBGet pauses everything when it starts with a config error, such as a download directory it cannot read, and stays paused after the cause clears. The health check cannot see that. Alert on `nzbgetvpn_nzbget_download_paused == 1 and nzbgetvpn_nzbget_remaining_bytes > 0`.
+- The series are left out when NZBGet's API does not answer, so add an `absent()` alert next to it.
+- No changes to the VPN or kill switch. NZBGet is still 26.3.
+
+See CHANGELOG.md for the full list.
+
+---
+
 ## v26.3.1 (2026-10-28)
 **Update: base image security fixes**
 

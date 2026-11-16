@@ -15,16 +15,24 @@ A background thread runs /root/healthcheck.sh every HEALTH_CHECK_INTERVAL
 seconds. Scrapes only read the cached result, so they never block on network
 probes. Without this loop nothing ran the health check under Kubernetes,
 which ignores the Dockerfile HEALTHCHECK, so the status file never existed.
+
+The nzbgetvpn_nzbget_* series are the exception: each scrape asks NZBGet's own
+API on loopback for its state (short timeout), because "the web UI answers"
+says nothing about whether NZBGet has paused itself.
 """
 
+import base64
 import collections
 import datetime
+import glob
 import json
 import logging
 import os
+import re
 import subprocess
 import threading
 import time
+import urllib.request
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
@@ -45,6 +53,18 @@ HEALTH_CHECK_RUN_TIMEOUT = int(os.environ.get('HEALTH_CHECK_RUN_TIMEOUT', '120')
 HEALTH_STATUS_MAX_AGE = int(os.environ.get('HEALTH_STATUS_MAX_AGE', '180'))
 # Number of recent probe runs nzbgetvpn_success_rate_percent is computed over
 SUCCESS_RATE_WINDOW = int(os.environ.get('SUCCESS_RATE_WINDOW', '20'))
+
+# NZBGet's JSON-RPC API. The default config authorizes 127.0.0.1 without a
+# password (AuthorizedIP); NZBGET_USER / NZBGET_PASS are sent when both are set.
+NZBGET_RPC_URL = os.environ.get('NZBGET_RPC_URL', 'http://127.0.0.1:6789/jsonrpc')
+NZBGET_RPC_TIMEOUT = float(os.environ.get('NZBGET_RPC_TIMEOUT', '3'))
+NZBGET_CONF = os.environ.get('NZBGET_CONF', '/config/nzbget.conf')
+
+# NZBGet logs this while loading a config it rejects (a directory it cannot
+# read, for example), then starts with downloads, post-processing and the scan
+# all paused and never resumes by itself. The start line follows it.
+CONFIG_ERROR_MESSAGE = 'Pausing all activities due to errors in configuration'
+NZBGET_START_LINE = re.compile(r'\tINFO\tnzbget \S+ (server|daemon)-mode\s*$')
 
 # Check results that count as passing / as not having run at all
 PASSING = {'success', 'up', 'stable'}
@@ -132,12 +152,77 @@ def vpn_interface_state(name):
         return False
 
 
+def fetch_nzbget_status():
+    """NZBGet's own view of itself (JSON-RPC `status`), or None if it did not answer."""
+    try:
+        request = urllib.request.Request(
+            NZBGET_RPC_URL, data=b'{"method":"status"}',
+            headers={'Content-Type': 'application/json'})
+        user, password = os.environ.get('NZBGET_USER'), os.environ.get('NZBGET_PASS')
+        if user and password:
+            token = base64.b64encode(f'{user}:{password}'.encode()).decode()
+            request.add_header('Authorization', f'Basic {token}')
+        with urllib.request.urlopen(request, timeout=NZBGET_RPC_TIMEOUT) as response:
+            result = json.load(response).get('result')
+        return result if isinstance(result, dict) else None
+    except Exception as e:
+        logger.debug(f"NZBGet status call failed: {e}")
+        return None
+
+
+def nzbget_log_files(conf_path=None):
+    """NZBGet's log files, newest first. WriteLog=rotate adds the date to LogFile's name."""
+    options = {}
+    try:
+        with open(conf_path or NZBGET_CONF, 'r', errors='replace') as f:
+            for line in f:
+                key, sep, value = line.strip().partition('=')
+                if sep and key in ('MainDir', 'LogFile'):
+                    options[key] = value.strip()
+    except OSError:
+        return []
+    log_file = options.get('LogFile', '${MainDir}/nzbget.log').replace('${MainDir}', options.get('MainDir', ''))
+    base, ext = os.path.splitext(log_file)
+    paths = set(glob.glob(f'{glob.escape(base)}-*{ext}'))
+    if os.path.exists(log_file):
+        paths.add(log_file)
+
+    def mtime(path):
+        try:
+            return os.path.getmtime(path)
+        except OSError:
+            return 0
+    return sorted(paths, key=mtime, reverse=True)
+
+
+def nzbget_config_error(log_paths):
+    """Did NZBGet's latest start pause everything because of config errors?
+
+    The message comes before the start line of the same start, so look between
+    the last two start lines. Returns None when no start line is left in the
+    logs (rotated away): unknown must not read as "no error".
+    """
+    for path in log_paths:
+        try:
+            with open(path, 'r', errors='replace') as f:
+                lines = f.read().splitlines()
+        except OSError:
+            continue
+        starts = [i for i, line in enumerate(lines) if NZBGET_START_LINE.search(line)]
+        if not starts:
+            continue
+        begin = starts[-2] + 1 if len(starts) > 1 else 0
+        return any(CONFIG_ERROR_MESSAGE in line for line in lines[begin:starts[-1]])
+    return None
+
+
 def escape_label(value):
     return str(value).replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n')
 
 
 def render_prometheus(status, status_age, history, interface_up, system=None,
-                      start_time=None, max_age=HEALTH_STATUS_MAX_AGE):
+                      start_time=None, max_age=HEALTH_STATUS_MAX_AGE,
+                      nzbget=None, config_error=None):
     """Build the Prometheus exposition from already-collected inputs.
 
     Pure function, so the semantics can be tested without a container.
@@ -217,6 +302,43 @@ def render_prometheus(status, status_age, history, interface_up, system=None,
         gauge('nzbgetvpn_start_time', 'Container start time (Unix timestamp)',
               [({}, start_time)])
 
+    # NZBGet's own state. Every series is left out when the API did not answer
+    # or did not send the field: a dead API must not look like "not paused".
+    nzbget = nzbget or {}
+
+    def nzbget_flag(name, key, help_text):
+        if isinstance(nzbget.get(key), bool):
+            gauge(name, help_text, [({}, 1 if nzbget[key] else 0)])
+
+    def number(key):
+        value = nzbget.get(key)
+        return value if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+
+    nzbget_flag('nzbgetvpn_nzbget_download_paused', 'DownloadPaused',
+                'NZBGet downloads are paused (by a user, a script, a schedule or NZBGet itself)')
+    nzbget_flag('nzbgetvpn_nzbget_post_paused', 'PostPaused', 'NZBGet post-processing is paused')
+    nzbget_flag('nzbgetvpn_nzbget_scan_paused', 'ScanPaused',
+                'NZBGet scanning of the incoming nzb directory is paused')
+    if number('DownloadRate') is not None:
+        gauge('nzbgetvpn_nzbget_download_rate_bytes', 'Current NZBGet download rate in bytes per second',
+              [({}, number('DownloadRate'))])
+    remaining = None
+    if number('RemainingSizeHi') is not None and number('RemainingSizeLo') is not None:
+        remaining = (int(number('RemainingSizeHi')) << 32) + int(number('RemainingSizeLo'))
+    elif number('RemainingSizeMB') is not None:
+        remaining = int(number('RemainingSizeMB')) * 1048576
+    if remaining is not None:
+        gauge('nzbgetvpn_nzbget_remaining_bytes',
+              'Bytes left to download in the NZBGet queue, paused items excluded',
+              [({}, remaining)])
+    nzbget_flag('nzbgetvpn_nzbget_server_standby', 'ServerStandBy',
+                'NZBGet is idle: nothing is being downloaded (empty queue or paused)')
+    if config_error is not None:
+        gauge('nzbgetvpn_nzbget_config_error',
+              'NZBGet logged config errors at its latest start and paused all activities. '
+              'Stays 1 until NZBGet restarts, even after a manual resume',
+              [({}, 1 if config_error else 0)])
+
     external_ip = (status or {}).get('external_ip')
     if external_ip and external_ip != 'unknown':
         gauge('nzbgetvpn_external_ip_info', 'External IP address seen by the latest health check',
@@ -286,6 +408,8 @@ def collect_prometheus():
         interface_up=vpn_interface_state(vpn_interface_name()),
         system=system,
         start_time=time.time() - get_uptime().get('seconds', 0),
+        nzbget=fetch_nzbget_status(),
+        config_error=nzbget_config_error(nzbget_log_files()),
     )
 
 

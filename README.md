@@ -449,10 +449,21 @@ The monitoring server runs the health check itself every `HEALTH_CHECK_INTERVAL`
 | `nzbgetvpn_success_rate_percent{check="..."}` | Share of the last `SUCCESS_RATE_WINDOW` runs (default 20) in which each check passed |
 | `nzbgetvpn_health_check_timestamp_seconds` | When the latest health check finished |
 | `nzbgetvpn_health_check` | Deprecated alias of `nzbgetvpn_healthy` |
+| `nzbgetvpn_nzbget_download_paused` | 1 when NZBGet's download queue is paused, whether by a user, a script, a schedule or NZBGet itself |
+| `nzbgetvpn_nzbget_post_paused` | 1 when post-processing is paused |
+| `nzbgetvpn_nzbget_scan_paused` | 1 when the scan of the incoming nzb directory is paused |
+| `nzbgetvpn_nzbget_download_rate_bytes` | Current download rate in bytes per second |
+| `nzbgetvpn_nzbget_remaining_bytes` | Bytes left to download in the queue (paused items excluded) |
+| `nzbgetvpn_nzbget_server_standby` | 1 when NZBGet is downloading nothing, because the queue is empty or it is paused |
+| `nzbgetvpn_nzbget_config_error` | 1 when NZBGet's latest start logged "Pausing all activities due to errors in configuration". Stays 1 until NZBGet restarts, even after a manual resume, so use it to explain a pause, not to detect one. |
 
 System gauges (`nzbgetvpn_memory_usage_percent`, `nzbgetvpn_cpu_usage_percent`, `nzbgetvpn_load_average`, `nzbgetvpn_start_time`, `nzbgetvpn_external_ip_info`) are unchanged.
 
 A result older than `HEALTH_STATUS_MAX_AGE` seconds (default 180) reports `nzbgetvpn_healthy` and `nzbgetvpn_vpn_connected` as 0, so a probe that stops running cannot keep reporting its last good result.
+
+The `nzbgetvpn_nzbget_*` series come from NZBGet's own JSON-RPC `status` call, made on each scrape. NZBGet starts paused when it finds an error in its configuration (a download directory it cannot read, for example) and does not resume when the cause clears. The web UI still answers in that state, so `nzbgetvpn_healthy` and `nzbgetvpn_check{check="nzbget"}` stay at 1. When the API does not answer, these series are left out instead of reported as 0, so pair any alert on them with an `absent()` check. `nzbgetvpn_nzbget_config_error` is read from NZBGet's log files and is also left out once the start line has rotated out of them.
+
+The call needs no password with NZBGet's default `AuthorizedIP=127.0.0.1`. If you removed that setting, set `NZBGET_USER` and `NZBGET_PASS`.
 
 Example alert rules:
 
@@ -466,6 +477,12 @@ Example alert rules:
 - alert: NZBGetNewsServerDown
   expr: nzbgetvpn_success_rate_percent{check="news_server"} < 50
   for: 10m
+- alert: NZBGetPaused
+  expr: nzbgetvpn_nzbget_download_paused == 1 and nzbgetvpn_nzbget_remaining_bytes > 0
+  for: 30m
+- alert: NZBGetStateMissing
+  expr: absent(nzbgetvpn_nzbget_download_paused)
+  for: 15m
 ```
 
 ### Docker Compose with Monitoring Stack
@@ -661,6 +678,8 @@ docker run -d \
 - `HEALTH_CHECK_INTERVAL` - Seconds between health checks run by the monitoring server (default: 30)
 - `HEALTH_STATUS_MAX_AGE` - Seconds after which a health result counts as stale and unhealthy (default: 180)
 - `SUCCESS_RATE_WINDOW` - Runs used for `nzbgetvpn_success_rate_percent` (default: 20)
+- `NZBGET_RPC_URL` - NZBGet JSON-RPC endpoint read for the `nzbgetvpn_nzbget_*` metrics (default: `http://127.0.0.1:6789/jsonrpc`)
+- `NZBGET_RPC_TIMEOUT` - Seconds to wait for that call on each scrape (default: 3)
 - `VPN_PROBE_HOST` / `VPN_PROBE_HOST_FALLBACK` - Targets pinged through the VPN interface to test the tunnel (default: `1.1.1.1` / `9.9.9.9`)
 - `ENABLE_AUTO_RESTART` - Auto-restart failed services (default: false)
 - `RESTART_COOLDOWN_SECONDS` - Minimum seconds between restarts of a service (default: 300)
