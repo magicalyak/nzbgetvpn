@@ -2,6 +2,16 @@
 
 All notable changes to nzbgetvpn will be documented in this file.
 
+## [v26.3.2] - 2026-11-16
+
+### Added
+- **Metrics for NZBGet's own state**: `nzbgetvpn_nzbget_download_paused`, `nzbgetvpn_nzbget_post_paused`, `nzbgetvpn_nzbget_scan_paused`, `nzbgetvpn_nzbget_download_rate_bytes`, `nzbgetvpn_nzbget_remaining_bytes` and `nzbgetvpn_nzbget_server_standby`, read from NZBGet's JSON-RPC `status` call on each scrape. NZBGet starts with everything paused when it finds an error in its configuration and never resumes by itself. On 2026-11-15 a stale NFS handle on `/downloads` at process start left it paused for 13 hours with 66 GB queued while `nzbgetvpn_healthy`, `nzbgetvpn_vpn_connected` and `nzbgetvpn_check{check="nzbget"}` all stayed at 1, because the web UI kept answering. The series are left out, not reported as 0, when the API does not answer.
+- **`nzbgetvpn_nzbget_config_error`**: 1 when NZBGet's latest start logged "Pausing all activities due to errors in configuration". Read from the log files named by `LogFile` in `nzbget.conf`. It stays 1 until NZBGet restarts and is left out once the start line has rotated out of the logs.
+- `NZBGET_RPC_URL` and `NZBGET_RPC_TIMEOUT`. `NZBGET_USER` / `NZBGET_PASS` are sent as basic auth when both are set; the default `AuthorizedIP=127.0.0.1` needs neither.
+
+### CI
+- `test-nzbget-status.sh` runs a real NZBGet in the image and checks every new series in the state it is meant to catch and after it clears: paused and resumed over JSON-RPC, paused with a queued nzb, started with a config error, and with NZBGet stopped. `test-metrics-render.py` covers the rendering, the status call and the log parsing.
+
 ## [v26.3.1] - 2026-10-28
 
 ### Updated
